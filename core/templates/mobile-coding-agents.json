@@ -1,0 +1,12 @@
+{
+  "$comment": "mobile-coding-agents project configuration. Every key is optional and shown with its default. `verify` example: {\"ios\": {\"quick\": \"xcodebuild build -workspace App.xcworkspace -scheme App -destination 'generic/platform=iOS Simulator' -quiet CODE_SIGNING_ALLOWED=NO\", \"test\": \"...\"}}. Run `mobile verify --dry-run` to see what would run.",
+  "baseBranch": "",
+  "protectedBranches": ["main", "master", "develop", "release/*", "production"],
+  "verifyGate": "block",
+  "lintOnEdit": true,
+  "verify": {},
+  "generated": [],
+  "sensitive": [],
+  "codemap": "docs/agent/CODEMAP.md",
+  "prLines": 400
+}

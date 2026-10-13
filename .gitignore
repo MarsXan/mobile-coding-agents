@@ -1,0 +1,8 @@
+evals/results/
+**/evals/results/
+__pycache__/
+*.pyc
+.DS_Store
+.mobile-coding-agents/
+*.proposed
+/private/

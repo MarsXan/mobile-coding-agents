@@ -1,0 +1,42 @@
+{
+  "paths": {
+    "source": ["**/src/main/**"],
+    "tests": ["**/src/test/**", "**/src/androidTest/**", "**/src/testFixtures/**"],
+    "heavy": [
+      "**/AndroidManifest.xml",
+      "**/schemas/**",
+      "**/*Database.kt",
+      "**/*Migration*.kt",
+      "**/proguard-rules.pro",
+      "**/consumer-rules.pro",
+      "**/network_security_config.xml",
+      "gradle/libs.versions.toml",
+      "**/build.gradle",
+      "**/build.gradle.kts",
+      "settings.gradle",
+      "settings.gradle.kts",
+      "gradle.properties",
+      "fastlane/**"
+    ],
+    "protected": ["config/detekt/**", "detekt.yml", ".editorconfig", "lint.xml", "**/lint-baseline.xml", ".mobile-coding-agents.json", ".gitlab-ci.yml", ".github/workflows/**"]
+  },
+  "checks": [
+    { "id": "compile", "run": "./gradlew --console=plain -q compileDebugKotlin", "stages": ["stop"], "timeoutSec": 900 },
+    { "id": "unit-tests", "run": "./gradlew --console=plain -q testDebugUnitTest", "stages": ["stop"], "timeoutSec": 1800 },
+    { "id": "mobile-risk", "run": "python3 TOOLKIT/core/bin/mobile risk --fail-on block", "stages": ["stop", "ci"] },
+    { "id": "lint-all", "run": "./gradlew --console=plain -q lintDebug", "stages": ["ci"], "timeoutSec": 1800 }
+  ],
+  "bannedPatterns": [
+    "@Suppress\\(",
+    "@SuppressLint\\(",
+    "@SuppressWarnings\\(",
+    "tools:ignore=",
+    "@Ignore\\b",
+    "@Disabled\\b",
+    "\\bGlobalScope\\b",
+    "fallbackToDestructiveMigration",
+    "-dontobfuscate",
+    "changeThreshold",
+    "maxPercentDifference"
+  ]
+}

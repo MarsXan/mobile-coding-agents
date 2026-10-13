@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild *)",
+      "Bash(swift build *)",
+      "Bash(swift test *)",
+      "Bash(swift package resolve *)",
+      "Bash(swift package describe *)",
+      "Bash(swift package show-dependencies *)",
+      "Bash(swiftlint lint *)",
+      "Bash(swiftlint version)",
+      "Bash(swiftformat --lint *)",
+      "Bash(xcrun simctl list *)",
+      "Bash(xcrun simctl boot *)",
+      "Bash(xcrun simctl install *)",
+      "Bash(xcrun simctl launch *)",
+      "Bash(xcrun simctl terminate *)",
+      "Bash(xcrun simctl io *)",
+      "Bash(xcrun simctl openurl *)",
+      "Bash(xcrun simctl get_app_container *)",
+      "Bash(xcrun xcresulttool *)",
+      "Bash(xcrun xctrace *)",
+      "Bash(plutil -lint *)",
+      "Bash(plutil -p *)",
+      "Bash(pod install *)",
+      "Bash(bundle exec pod install *)"
+    ],
+    "ask": [
+      "Bash(xcodebuild *-exportArchive*)",
+      "Bash(xcodebuild *-allowProvisioningUpdates*)",
+      "Bash(xcrun altool *)",
+      "Bash(xcrun notarytool *)",
+      "Bash(xcrun simctl erase *)",
+      "Bash(xcrun simctl delete *)",
+      "Bash(security import *)",
+      "Bash(pod trunk *)",
+      "Bash(pod repo push *)"
+    ],
+    "deny": [
+      "Bash(security delete-*)"
+    ]
+  }
+}

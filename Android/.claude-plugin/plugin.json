@@ -1,0 +1,8 @@
+{
+  "name": "mobile-android",
+  "version": "0.1.0",
+  "description": "Android expertise pack for the mobile-coding-agents toolkit: Gradle and AGP, Views and Java legacy, coroutines and lifecycle, Room, Compose interop, testing, performance, release gates",
+  "author": { "name": "Mohsen" },
+  "keywords": ["android", "kotlin", "compose", "gradle"],
+  "dependencies": ["mobile-core"]
+}

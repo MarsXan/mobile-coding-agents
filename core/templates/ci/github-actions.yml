@@ -1,0 +1,54 @@
+# mobile-coding-agents: pull-request checks for GitHub Actions.
+# Save as .github/workflows/mobile-coding-agents.yml. Not exercised by the toolkit's own tests:
+# run it once on a throwaway pull request before relying on it.
+#
+# Repository variables and secrets:
+#   vars.MOBILE_CODING_AGENTS_REPO   owner/name of your copy of this toolkit
+#   vars.MOBILE_CODING_AGENTS_REF    a tag or commit SHA to pin it to
+#   secrets.ANTHROPIC_API_KEY only needed by the optional review job
+name: mobile-coding-agents
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  # Deterministic and free: no model call.
+  mobile-risk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ vars.MOBILE_CODING_AGENTS_REPO }}
+          ref: ${{ vars.MOBILE_CODING_AGENTS_REF }}
+          path: .mobile-coding-agents
+      - run: python3 .mobile-coding-agents/core/bin/mobile risk --base "origin/${{ github.base_ref }}" --fail-on block
+
+  # Optional, costs API usage: a read-only review with the toolkit's review skill.
+  # Secrets are not available to pull requests from forks, so this runs for same-repository branches only.
+  # Never switch this job to pull_request_target with a checkout of the pull-request head.
+  review:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          plugin_marketplaces: "https://github.com/${{ vars.MOBILE_CODING_AGENTS_REPO }}.git"
+          plugins: "mobile-core@mobile-coding-agents\nmobile-ios@mobile-coding-agents"
+          prompt: "/mobile-core:review origin/${{ github.base_ref }}"
+          claude_args: >-
+            --max-turns 40
+            --allowedTools "Read" "Grep" "Glob" "Skill" "Bash(mobile risk *)" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(git merge-base *)" "Bash(git status *)" "mcp__github_inline_comment__create_inline_comment"

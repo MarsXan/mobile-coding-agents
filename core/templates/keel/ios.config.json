@@ -1,0 +1,33 @@
+{
+  "paths": {
+    "source": ["**/*.swift", "**/*.m", "**/*.mm", "**/*.h"],
+    "tests": ["**/*Tests/**", "**/*UITests/**", "**/Tests/**"],
+    "heavy": [
+      "**/*.xcdatamodeld/**",
+      "**/*.entitlements",
+      "**/Info.plist",
+      "**/PrivacyInfo.xcprivacy",
+      "**/*.xcconfig",
+      "**/project.pbxproj",
+      "**/*.xcproj",
+      "Package.swift",
+      "Podfile",
+      "fastlane/**"
+    ],
+    "protected": [".swiftlint.yml", ".swiftformat", ".mobile-coding-agents.json", ".gitlab-ci.yml", ".github/workflows/**", "ci_scripts/**"]
+  },
+  "checks": [
+    { "id": "swiftlint", "run": "swiftlint lint --strict --quiet {files}", "stages": ["stop"], "files": ["**/*.swift"] },
+    { "id": "build", "run": "xcodebuild build -workspace APP.xcworkspace -scheme SCHEME -destination 'generic/platform=iOS Simulator' -quiet CODE_SIGNING_ALLOWED=NO", "stages": ["stop"], "timeoutSec": 1200 },
+    { "id": "mobile-risk", "run": "python3 TOOLKIT/core/bin/mobile risk --fail-on block", "stages": ["stop", "ci"] },
+    { "id": "test-all", "run": "xcodebuild test -workspace APP.xcworkspace -scheme SCHEME -destination 'platform=iOS Simulator,name=SIMULATOR' -quiet CODE_SIGNING_ALLOWED=NO", "stages": ["ci"], "timeoutSec": 3600 }
+  ],
+  "bannedPatterns": [
+    "swiftlint:disable",
+    "XCTSkip",
+    "\\.disabled\\(",
+    "@unchecked\\s+Sendable",
+    "nonisolated\\(unsafe\\)",
+    "perceptualPrecision"
+  ]
+}

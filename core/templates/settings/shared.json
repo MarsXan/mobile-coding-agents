@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mobile detect *)",
+      "Bash(mobile verify *)",
+      "Bash(mobile recon *)",
+      "Bash(mobile risk *)",
+      "Bash(mobile doctor *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(gh pr create *)",
+      "Bash(glab mr create *)",
+      "Bash(gh release *)",
+      "Bash(glab release *)",
+      "Bash(fastlane *)",
+      "Bash(bundle exec fastlane *)",
+      "Bash(firebase *)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(!.env.example)",
+      "Read(!.env.sample)",
+      "Read(*.jks)",
+      "Read(*.keystore)",
+      "Read(*.p12)",
+      "Read(*.p8)",
+      "Read(key.properties)",
+      "Read(keystore.properties)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.netrc)",
+      "Read(~/.gradle/gradle.properties)",
+      "Read(~/.appstoreconnect/**)",
+      "Read(~/Library/Keychains/**)",
+      "Edit(/.mobile-coding-agents.json)",
+      "Bash(fastlane match nuke *)",
+      "Bash(bundle exec fastlane match nuke *)"
+    ]
+  }
+}

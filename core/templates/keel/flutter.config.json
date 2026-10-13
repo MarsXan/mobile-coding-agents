@@ -1,0 +1,34 @@
+{
+  "paths": {
+    "source": ["lib/**", "packages/*/lib/**"],
+    "tests": ["test/**", "integration_test/**", "packages/*/test/**"],
+    "heavy": [
+      "pubspec.yaml",
+      "**/drift_schemas/**",
+      "**/*database*.dart",
+      "**/*migration*.dart",
+      "android/app/src/main/AndroidManifest.xml",
+      "android/**/build.gradle",
+      "android/**/build.gradle.kts",
+      "ios/Runner/Info.plist",
+      "ios/Runner/*.entitlements",
+      "ios/Podfile",
+      "fastlane/**"
+    ],
+    "protected": ["analysis_options.yaml", ".fvmrc", ".mobile-coding-agents.json", ".gitlab-ci.yml", ".github/workflows/**"]
+  },
+  "checks": [
+    { "id": "analyze", "run": "flutter analyze --no-pub", "stages": ["stop"], "timeoutSec": 600 },
+    { "id": "test", "run": "flutter test --no-pub", "stages": ["stop"], "timeoutSec": 1800 },
+    { "id": "mobile-risk", "run": "python3 TOOLKIT/core/bin/mobile risk --fail-on block", "stages": ["stop", "ci"] },
+    { "id": "format", "run": "dart format --output=none --set-exit-if-changed {files}", "stages": ["ci"], "files": ["**/*.dart"] }
+  ],
+  "bannedPatterns": [
+    "//\\s*ignore:",
+    "//\\s*ignore_for_file:",
+    "skip:\\s*true",
+    "@Skip\\(",
+    "badCertificateCallback",
+    "dependency_overrides"
+  ]
+}

@@ -1,0 +1,81 @@
+# mobile-coding-agents: merge-request checks for GitLab CI.
+# Copy the jobs you want into your .gitlab-ci.yml. Not exercised by the toolkit's own tests:
+# run each once on a throwaway merge request before relying on it.
+#
+# Variables to set in Settings > CI/CD > Variables:
+#   MOBILE_CODING_AGENTS_REPO   git URL of your copy of this toolkit (pin MOBILE_CODING_AGENTS_REF to a tag or commit)
+#   ANTHROPIC_API_KEY    masked; only needed by the optional claude-review job
+#   GITLAB_ACCESS_TOKEN  masked; only needed if claude-review should post a merge-request note
+
+stages:
+  - checks
+  - review
+
+.mobile-coding-agents:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    GIT_DEPTH: "0"                       # the diff needs the merge base
+    MOBILE_CODING_AGENTS_REF: "main"            # pin to a tag or a commit SHA
+  before_script:
+    - git clone --depth 1 --branch "$MOBILE_CODING_AGENTS_REF" "$MOBILE_CODING_AGENTS_REPO" /tmp/mobile-coding-agents
+    - git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+
+# Deterministic and free: no model call. Fails the pipeline on a blocking signal
+# (schema change without a migration, a credential in the diff, a destructive fallback).
+mobile-risk:
+  extends: .mobile-coding-agents
+  stage: checks
+  image: python:3.12-alpine
+  before_script:
+    - apk add --no-cache git
+    - !reference [.mobile-coding-agents, before_script]
+  script:
+    - python3 /tmp/mobile-coding-agents/core/bin/mobile risk --base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" --fail-on block
+
+# Deterministic secret scan of the commits in the merge request.
+secret-scan:
+  stage: checks
+  image:
+    name: zricethezav/gitleaks:latest      # pin a version or a digest
+    entrypoint: [""]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    GIT_DEPTH: "0"
+  script:
+    - gitleaks git --redact --log-opts="origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME..HEAD" .
+
+# Optional, costs API usage: a read-only review with the toolkit's review skill.
+# It cannot edit files, push, or run anything except the listed read-only commands.
+# Do not run it on merge requests from forks: the repository under review is untrusted input.
+claude-review:
+  extends: .mobile-coding-agents
+  stage: review
+  image: node:24-alpine3.21
+  allow_failure: true
+  before_script:
+    - apk add --no-cache git curl bash python3
+    - curl -fsSL https://claude.ai/install.sh | bash
+    - export PATH="$HOME/.local/bin:$PATH"
+    - !reference [.mobile-coding-agents, before_script]
+  script:
+    - >
+      claude -p "/mobile-core:review origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+      --plugin-dir /tmp/mobile-coding-agents/core
+      --plugin-dir /tmp/mobile-coding-agents/iOS
+      --setting-sources user
+      --allowedTools "Read" "Grep" "Glob" "Skill" "Bash(mobile risk *)" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(git merge-base *)" "Bash(git status *)"
+      --max-turns 40
+      --output-format json > review.json
+    - python3 -c "import json; print(json.load(open('review.json')).get('result', ''))" | tee review.md
+    # To post the review as a merge-request note, uncomment:
+    # - |
+    #   curl --fail --silent --request POST \
+    #     --header "PRIVATE-TOKEN: $GITLAB_ACCESS_TOKEN" \
+    #     --data-urlencode "body@review.md" \
+    #     "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/notes"
+  artifacts:
+    when: always
+    paths: [review.md, review.json]
+    expire_in: 2 weeks

@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew *)",
+      "Bash(adb devices *)",
+      "Bash(adb logcat *)",
+      "Bash(adb install *)",
+      "Bash(adb shell am *)",
+      "Bash(adb shell dumpsys *)",
+      "Bash(adb shell getprop *)",
+      "Bash(adb shell input *)",
+      "Bash(adb shell screencap *)",
+      "Bash(adb exec-out screencap *)",
+      "Bash(ktlint *)",
+      "Bash(detekt *)"
+    ],
+    "ask": [
+      "Bash(./gradlew *publish*)",
+      "Bash(./gradlew *Publish*)",
+      "Bash(./gradlew *upload*)",
+      "Bash(./gradlew *Upload*)",
+      "Bash(./gradlew *promote*)",
+      "Bash(adb uninstall *)",
+      "Bash(adb shell pm clear *)",
+      "Bash(adb shell pm uninstall *)",
+      "Bash(keytool *)",
+      "Bash(fastboot *)"
+    ],
+    "deny": []
+  }
+}

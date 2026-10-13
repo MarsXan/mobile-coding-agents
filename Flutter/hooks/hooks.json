@@ -1,0 +1,21 @@
+{
+  "description": "One line at session start naming this pack's skill, so it is found without relying on description matching.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf",
+            "args": [
+              "%s\n",
+              "The Flutter expertise pack is enabled in this repository. Its `mobile-flutter:flutter` skill has reference notes on toolchain and native build failures, state-management and navigation migrations, async and isolates, drift, sqflite and Hive migrations, testing, performance, and store requirements. The notes carry dated platform requirements and migration traps that general knowledge often gets wrong; the skill says which note matches a task."
+            ],
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

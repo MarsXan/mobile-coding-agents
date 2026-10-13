@@ -1,0 +1,21 @@
+{
+  "description": "One line at session start naming this pack's skill, so it is found without relying on description matching.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf",
+            "args": [
+              "%s\n",
+              "The iOS expertise pack is enabled in this repository. Its `mobile-ios:ios` skill has reference notes on xcodebuild, signing and package failures, UIKit and Objective-C legacy code, Swift concurrency, Core Data and SwiftData migrations, testing, performance, and App Store requirements. The notes carry dated platform requirements and migration traps that general knowledge often gets wrong; the skill says which note matches a task."
+            ],
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
