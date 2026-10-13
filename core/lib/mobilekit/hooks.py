@@ -99,6 +99,7 @@ def session_start(payload):
     if isinstance(previous, dict) and previous.get("root") == root and previous.get("baseline"):
         session["baseline"] = previous["baseline"]      # a resumed session keeps its starting point
         session["nagged"] = previous.get("nagged")
+        session["noticed"] = previous.get("noticed")
     else:
         session["baseline"] = verify.source_fingerprint(root)
     _save(session, path)
@@ -123,14 +124,30 @@ def session_start(payload):
     return 0
 
 
-def _decision(verdict):
-    if not verdict.decision:
-        return None
-    return {"hookSpecificOutput": {
-        "hookEventName": "PreToolUse",
-        "permissionDecision": verdict.decision,
-        "permissionDecisionReason": "[mobile-coding-agents] " + verdict.reason,
-    }}
+def _fresh_notes(verdict, session, path):
+    """The verdict's notes for the agent. One that carries an id is given once per session."""
+    seen = set(session.get("notes") or [])
+    texts = []
+    for ident, text in verdict.context:
+        if ident is None:
+            texts.append(text)
+        elif ident not in seen:
+            seen.add(ident)
+            texts.append(text)
+    if len(seen) != len(session.get("notes") or []):
+        session["notes"] = sorted(seen)
+        _save(session, path)
+    return texts
+
+
+def _decision(verdict, notes=()):
+    out = {"hookEventName": "PreToolUse"}
+    if verdict.decision:
+        out["permissionDecision"] = verdict.decision
+        out["permissionDecisionReason"] = "[mobile-coding-agents] " + verdict.reason
+    if notes and verdict.decision != guards.DENY:
+        out["additionalContext"] = "[mobile-coding-agents] " + " ".join(notes)
+    return {"hookSpecificOutput": out} if len(out) > 1 else None
 
 
 def pre_bash(payload):
@@ -148,11 +165,11 @@ def pre_bash(payload):
 
 def pre_edit(payload):
     root = _root(payload)
-    session, _ = _session(payload, root)
+    session, path = _session(payload, root)
     if not session.get("platforms"):
         return 0
     verdict = guards.check_edit(payload.get("tool_name") or "Edit", payload.get("tool_input") or {}, config_module.load(root), root)
-    out = _decision(verdict)
+    out = _decision(verdict, _fresh_notes(verdict, session, path))
     if out:
         _emit(out)
     return 0
@@ -240,7 +257,16 @@ def post_edit(payload):
     return 0
 
 
+_UNVERIFIED = "Source files changed in this session and the current state has not passed `mobile verify`."
+
+
 def stop(payload):
+    """What happens when the agent finishes with source changes that were not verified.
+
+    notice (default): one line for the person, once until the next verify. The
+    agent is not sent back and nothing runs, so it costs no time.
+    require: the agent is sent back once per unverified state to run the checks.
+    """
     if payload.get("stop_hook_active"):
         return 0
     root = _root(payload)
@@ -248,24 +274,29 @@ def stop(payload):
     if not session.get("platforms") or not session.get("baseline"):
         return 0
     config = config_module.load(root)
-    if config.keel_adopted or config["verifyGate"] == "off":
+    gate = config["verifyGate"]
+    if config.keel_adopted or gate == "off":
         return 0
     current = verify.source_fingerprint(root)
-    if current == session.get("baseline") or current == session.get("nagged"):
+    if current == session.get("baseline") or verify.read_stamp(root).get("fingerprint") == current:
+        if session.get("noticed"):
+            session["noticed"] = False      # verified again: the next unverified change is news
+            _save(session, path)
         return 0
-    if verify.read_stamp(root).get("fingerprint") == current:
+    if gate == "require":
+        if current == session.get("nagged"):
+            return 0
+        session["nagged"] = current
+        _save(session, path)
+        _emit({"decision": "block", "reason": "[mobile-coding-agents] " + _UNVERIFIED + (
+            " Run `mobile verify --level quick` (use `test` when behaviour changed), then report the result."
+            " If it cannot be verified here, say that plainly instead of calling the work done.")})
         return 0
-    session["nagged"] = current
+    if session.get("noticed"):
+        return 0
+    session["noticed"] = True
     _save(session, path)
-    message = (
-        "Source files changed in this session and the current state has not passed `mobile verify`. "
-        "Run `mobile verify --level quick` (use `test` when behaviour changed), then report the result. "
-        "If it cannot be verified here, say that plainly instead of calling the work done."
-    )
-    if config["verifyGate"] == "remind":
-        _emit({"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": message}})
-    else:
-        _emit({"decision": "block", "reason": "[mobile-coding-agents] " + message})
+    _emit({"systemMessage": "[mobile-coding-agents] " + _UNVERIFIED})
     return 0
 
 

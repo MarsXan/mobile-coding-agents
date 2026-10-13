@@ -12,19 +12,22 @@
       "Bash(adb shell screencap *)",
       "Bash(adb exec-out screencap *)",
       "Bash(ktlint *)",
-      "Bash(detekt *)"
+      "Bash(detekt *)",
+      "Bash(adb uninstall *)",
+      "Bash(adb shell pm clear *)",
+      "Bash(adb shell pm list *)",
+      "Bash(adb push *)",
+      "Bash(adb pull *)",
+      "Bash(adb forward *)",
+      "Bash(adb reverse *)",
+      "Bash(keytool -list *)"
     ],
     "ask": [
       "Bash(./gradlew *publish*)",
       "Bash(./gradlew *Publish*)",
       "Bash(./gradlew *upload*)",
       "Bash(./gradlew *Upload*)",
-      "Bash(./gradlew *promote*)",
-      "Bash(adb uninstall *)",
-      "Bash(adb shell pm clear *)",
-      "Bash(adb shell pm uninstall *)",
-      "Bash(keytool *)",
-      "Bash(fastboot *)"
+      "Bash(./gradlew *promote*)"
     ],
     "deny": []
   }

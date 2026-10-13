@@ -1,6 +1,6 @@
 # Keel stack fragments for mobile
 
-[Keel](https://github.com/MarsXan/keel) is a separate, stricter harness: approvals bound to content, a fail-closed stop gate, and its own tested shell policy. mobile-coding-agents does not duplicate any of that. In a project that has adopted Keel, mobile-coding-agents' stop gate and lint-on-edit stand down automatically, and its release, signing and device guards keep running beside Keel's.
+[Keel](https://github.com/MarsXan/keel) is a separate, stricter harness: approvals bound to content, a fail-closed stop gate, and its own tested shell policy. mobile-coding-agents does not duplicate any of that. In a project that has adopted Keel, mobile-coding-agents' stop notice and lint-on-edit stand down automatically, and its release, signing and device guards keep running beside Keel's.
 
 These files are the mobile equivalent of `keel-nestjs/templates/keel.config.json`: the paths, checks and banned patterns to merge into a project's `.keel/config.json`.
 

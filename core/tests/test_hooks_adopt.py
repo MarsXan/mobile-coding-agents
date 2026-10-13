@@ -85,13 +85,44 @@ class HookProcessTests(unittest.TestCase):
         self.assertEqual(self.hook(project, "post-edit", payload), "")
         self.assertIn("stored on users' devices", self.hook(project, "post-edit", payload, session="s2"))
 
-    def test_stop_gate_blocks_once_per_unverified_state(self):
+    def test_pre_edit_tells_the_agent_instead_of_asking_a_person(self):
+        project = fixtures.ios_project(git=True)
+        self.addCleanup(project.cleanup)
+        ci = {"tool_name": "Edit", "tool_input": {"file_path": project.root + "/.gitlab-ci.yml", "old_string": "a", "new_string": "b"}}
+        first = self.decision(self.hook(project, "pre-edit", ci))
+        self.assertNotIn("permissionDecision", first, "no prompt")
+        self.assertIn("CI pipeline", first["additionalContext"])
+        self.assertEqual(self.hook(project, "pre-edit", ci), "", "said once per file in a session")
+        suppress = {"tool_name": "Edit", "tool_input": {"file_path": project.root + "/App/Model.swift",
+                    "old_string": "let id: Int", "new_string": "let id: Int // swiftlint:disable:this identifier_name"}}
+        for _ in range(2):
+            out = self.decision(self.hook(project, "pre-edit", suppress))
+            self.assertNotIn("permissionDecision", out)
+            self.assertIn("This edit adds", out["additionalContext"])
+
+    def test_stop_gives_one_notice_and_never_holds_the_agent(self):
         project = fixtures.ios_project(git=True)
         self.addCleanup(project.cleanup)
         self.hook(project, "session-start", {"source": "startup"})
         self.assertEqual(self.hook(project, "stop"), "", "nothing changed yet")
         project.write("README.md", "docs only\n")
         self.assertEqual(self.hook(project, "stop"), "", "non-source change")
+        project.write("App/Model.swift", "struct Model { let id: String }\n")
+        noticed = json.loads(self.hook(project, "stop"))
+        self.assertEqual(list(noticed), ["systemMessage"], "a line for the person; nothing that sends the agent back")
+        self.assertIn("mobile verify", noticed["systemMessage"])
+        project.write("App/Model.swift", "struct Model { let id: UUID }\n")
+        self.assertEqual(self.hook(project, "stop"), "", "one notice until the next verify, however many changes follow")
+        verify.write_stamp(project.root, "quick", ["ios"])
+        self.assertEqual(self.hook(project, "stop"), "", "verified")
+        project.write("App/Model.swift", "struct Model { let id: Int64 }\n")
+        self.assertIn("systemMessage", self.hook(project, "stop"), "unverified again after a verify: said once more")
+
+    def test_require_mode_sends_the_agent_back_once_per_unverified_state(self):
+        project = fixtures.ios_project(git=True)
+        self.addCleanup(project.cleanup)
+        project.write(".mobile-coding-agents.json", '{"verifyGate": "require"}')
+        self.hook(project, "session-start", {"source": "startup"})
         project.write("App/Model.swift", "struct Model { let id: String }\n")
         blocked = json.loads(self.hook(project, "stop"))
         self.assertEqual(blocked["decision"], "block")
@@ -100,23 +131,16 @@ class HookProcessTests(unittest.TestCase):
         self.assertEqual(self.hook(project, "stop"), "", "already told for this state")
         project.write("App/Model.swift", "struct Model { let id: UUID }\n")
         self.assertIn("block", self.hook(project, "stop"), "a new state is a new reminder")
+        verify.write_stamp(project.root, "quick", ["ios"])
+        self.assertEqual(self.hook(project, "stop"), "", "verified")
 
-    def test_stop_gate_passes_after_verify_and_respects_configuration(self):
+    def test_stop_can_be_switched_off(self):
         project = fixtures.ios_project(git=True)
         self.addCleanup(project.cleanup)
+        project.write(".mobile-coding-agents.json", '{"verifyGate": "off"}')
         self.hook(project, "session-start", {"source": "startup"})
         project.write("App/Model.swift", "struct Model { let id: String }\n")
-        verify.write_stamp(project.root, "quick", ["ios"])
         self.assertEqual(self.hook(project, "stop"), "")
-
-        other = fixtures.ios_project(git=True)
-        self.addCleanup(other.cleanup)
-        other.write(".mobile-coding-agents.json", '{"verifyGate": "remind"}')
-        self.hook(other, "session-start", {"source": "startup"}, session="s3")
-        other.write("App/Model.swift", "struct Model { let id: String }\n")
-        reminded = json.loads(self.hook(other, "stop", session="s3"))
-        self.assertEqual(reminded["hookSpecificOutput"]["hookEventName"], "Stop")
-        self.assertNotIn("decision", reminded)
 
     def test_keel_governed_project_keeps_bash_guard_and_drops_the_stop_gate(self):
         project = fixtures.ios_project(git=True)

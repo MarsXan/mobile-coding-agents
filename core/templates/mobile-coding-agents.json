@@ -1,8 +1,9 @@
 {
-  "$comment": "mobile-coding-agents project configuration. Every key is optional and shown with its default. `verify` example: {\"ios\": {\"quick\": \"xcodebuild build -workspace App.xcworkspace -scheme App -destination 'generic/platform=iOS Simulator' -quiet CODE_SIGNING_ALLOWED=NO\", \"test\": \"...\"}}. Run `mobile verify --dry-run` to see what would run.",
+  "$comment": "mobile-coding-agents project configuration. Every key is optional and shown with its default. `verifyGate`: notice (one line when a session ends with unverified source changes), require (the agent is sent back to run the checks), off. `prompts`: few (a person is asked only before publishing, signing changes, losing work or skipping checks), strict (also device data, installs, edits to CI and signing configuration, new suppressions). `verify` example: {\"ios\": {\"quick\": \"xcodebuild build -workspace App.xcworkspace -scheme App -destination 'generic/platform=iOS Simulator' -quiet CODE_SIGNING_ALLOWED=NO\", \"test\": \"...\"}}. Run `mobile verify --dry-run` to see what would run.",
   "baseBranch": "",
   "protectedBranches": ["main", "master", "develop", "release/*", "production"],
-  "verifyGate": "block",
+  "verifyGate": "notice",
+  "prompts": "few",
   "lintOnEdit": true,
   "verify": {},
   "generated": [],

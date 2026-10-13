@@ -4,7 +4,19 @@ An agentic engineering toolkit for iOS, Android and Flutter teams who use Claude
 
 It concentrates on what the skill packs surveyed in [the shortlist](docs/01-shortlist.md) cover least: understanding and changing legacy code safely, incremental migrations, stored-data safety, release guards, and sensors that give the same answer every time.
 
-Version 0.1.0, built and tested with Claude Code 2.1.296 in October 2026.
+Version 0.2.0, built and tested with Claude Code 2.1.296 in October 2026.
+
+## Fast by default
+
+Guardrails that stop a person at every step make agent work slower than working alone. This toolkit is built not to do that.
+
+- **It refuses instead of asking.** A secret pasted into source, a hand edit to a generated file or a lockfile, a force push to a protected branch: the agent is told why and takes the right route. Nobody is interrupted.
+- **It asks a person only before something hard to undo:** uploading or publishing a build, changing signing assets, a git command that would discard uncommitted work, skipping the repository's own checks.
+- **It never sends the agent back to run a build.** If a session ends with source changes that were not verified, you get one line saying so.
+- **It adds no prompts to routine work.** The settings it offers are mostly allow rules, for everyday build, test, lint, simulator and git commands.
+- **Its hooks are quick:** 50 ms before a command or an edit, about 140 ms after an edit and at the end of a turn, measured on a 350,000-line iOS project.
+
+A team that wants more can set `"prompts": "strict"` and `"verifyGate": "require"` in `.mobile-coding-agents.json`. Section 5 of the [setup guide](docs/03-setup-and-validation.md) lists exactly what each setting does.
 
 ## Documentation
 
@@ -22,12 +34,12 @@ Version 0.1.0, built and tested with Claude Code 2.1.296 in October 2026.
 core/                             mobile-core
   bin/mobile                        CLI: detect, verify, recon, risk, doctor, adopt, hook
   lib/mobilekit/                    its code (Python 3.9+, standard library only)
-  hooks/hooks.json                  session facts, shell guard, edit guard, lint on edited lines, stop gate
+  hooks/hooks.json                  session facts, shell guard, edit guard, lint on edited lines, stop notice
   skills/                           recon, safe-change, migrate, diagnose, review, design, release-check
   agents/                           cartographer (maps code), reviewer (fresh-context review)
   workflows/migration-audit.js      read-only, parallel assessment of every module for a migration
   templates/                        AGENTS.md, CLAUDE.md, settings fragments, path-scoped rules, CI jobs, Keel fragments
-  tests/                            85 unit tests
+  tests/                            92 unit tests
   evals/                            8 eval cases for the core alone
 iOS/  Android/  Flutter/          one skill each, with seven reference files: build, legacy, concurrency,
                                   persistence, testing, performance, release; plus a one-line session-start
@@ -92,12 +104,15 @@ Inside a Claude Code session with the plugin enabled, `mobile` is on the path. A
 
 Verified on the machine this was built on (macOS 26, Xcode 26.0, Flutter 3.44.8, Claude Code 2.1.296):
 
-- 85 unit tests pass on Python 3.13 and on the system Python 3.9.
+- 92 unit tests pass on Python 3.13 and on the system Python 3.9.
 - All four plugins and the marketplace pass `claude plugin validate --strict`.
 - Always-on cost: about 1,270 tokens for the core, about 230 for each platform pack.
 - `detect`, `recon` and `doctor` were run read-only against a production iOS codebase of about 350,000 lines.
 - Toolchain behaviour inside Claude Code's sandbox, for SwiftPM, `xcodebuild`, `simctl` and Flutter.
-- The eval suites, three runs per arm on Sonnet: with the plugins the suite scores 0.99; five cases fail without them (a live key written to source, a generated file hand-edited, a deep link that only works while the app is running, no measurement before a performance fix, no behaviour pinning before a legacy refactor). The plugin arm cost about 40% more per run. Details in the setup guide.
+- The eval suites, three runs per arm on Sonnet: with the plugins the suite scores 0.99; five cases fail without them (a live key written to source, a generated file hand-edited, a deep link that only works while the app is running, no measurement before a performance fix, no behaviour pinning before a legacy refactor). Details in the setup guide.
+- Overhead with the 0.2.0 defaults, on the six cases that edit code: 17% more time and 31% more cost per task than no plugin. With the stop gate of 0.1.0 it was 56% and 51%.
+- Hook time on that iOS codebase: about 50 ms before a command or an edit, about 140 ms after an edit and at the end of a turn.
+- One live session confirming that the end-of-turn notice reaches the person and does not send the agent back.
 - Session-start facts reaching the model, and the Dart language server answering through the Flutter pack, in a live session.
 - Installing from GitHub into a clean Claude Code configuration: the marketplace, then `mobile-core` and `mobile-ios`.
 

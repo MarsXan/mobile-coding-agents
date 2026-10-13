@@ -118,11 +118,13 @@ def main(root, out=print):
     for problem in getattr(config, "problems", []):
         report(WARN, problem)
     if config.keel_adopted:
-        report(INFO, "Keel governs this project: the mobile-coding-agents stop gate and lint-on-edit stand down")
+        report(INFO, "Keel governs this project: the mobile-coding-agents stop notice and lint-on-edit stand down")
+    elif platforms:
+        report(OK, "guards: prompts %s (few: only before something hard to undo), end of turn %s" % (config["prompts"], config["verifyGate"]))
 
     instruction_files = [name for name in ("AGENTS.md", "CLAUDE.md", ".claude/CLAUDE.md") if os.path.isfile(os.path.join(root, name))]
     if platforms and not instruction_files:
-        report(WARN, "no AGENTS.md or CLAUDE.md: run `mobile adopt` to add the project overlay")
+        report(INFO, "no AGENTS.md or CLAUDE.md. The plugins work without one; `mobile adopt` writes a short starter")
     for name in instruction_files:
         lines = util.read_text(os.path.join(root, name)).count("\n")
         report(WARN if lines > 150 else OK, "%s: %d lines%s" % (name, lines, " (over 150: every line is paid for in every request)" if lines > 150 else ""))

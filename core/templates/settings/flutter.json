@@ -26,15 +26,17 @@
       "Bash(fvm dart analyze *)",
       "Bash(fvm dart test *)",
       "Bash(fvm dart format *)",
-      "Bash(fvm dart run build_runner *)"
+      "Bash(fvm dart run build_runner *)",
+      "Bash(flutter pub add *)",
+      "Bash(flutter pub remove *)",
+      "Bash(dart pub add *)",
+      "Bash(dart pub remove *)"
     ],
     "ask": [
       "Bash(flutter pub publish *)",
       "Bash(dart pub publish *)",
-      "Bash(flutter pub upgrade --major-versions*)",
-      "Bash(flutter pub global activate *)",
-      "Bash(dart pub global activate *)",
-      "Bash(shorebird *)"
+      "Bash(shorebird release *)",
+      "Bash(shorebird patch *)"
     ],
     "deny": []
   }

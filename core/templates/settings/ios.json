@@ -23,17 +23,19 @@
       "Bash(plutil -lint *)",
       "Bash(plutil -p *)",
       "Bash(pod install *)",
-      "Bash(bundle exec pod install *)"
-    ],
-    "ask": [
-      "Bash(xcodebuild *-exportArchive*)",
-      "Bash(xcodebuild *-allowProvisioningUpdates*)",
-      "Bash(xcrun altool *)",
-      "Bash(xcrun notarytool *)",
+      "Bash(bundle exec pod install *)",
+      "Bash(xcrun simctl shutdown *)",
+      "Bash(xcrun simctl uninstall *)",
       "Bash(xcrun simctl erase *)",
       "Bash(xcrun simctl delete *)",
-      "Bash(security import *)",
-      "Bash(pod trunk *)",
+      "Bash(xcrun simctl create *)",
+      "Bash(bundle install *)",
+      "Bash(security find-identity *)"
+    ],
+    "ask": [
+      "Bash(xcrun altool *)",
+      "Bash(xcrun notarytool submit *)",
+      "Bash(pod trunk push *)",
       "Bash(pod repo push *)"
     ],
     "deny": [

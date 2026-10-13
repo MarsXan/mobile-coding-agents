@@ -43,7 +43,7 @@ Read:
 
 Do:
 1. Read `core/lib/mobilekit/guards.py` and `core/tests/test_guards.py`. The tests are the specification. Add one rule your team needs (a project-specific release script, a directory nobody may edit) **test first**.
-2. Trigger each guard on purpose in a scratch branch: paste a fake key, edit a `.g.dart` or `Package.resolved`, run `git reset --hard`, ask for a lint suppression.
+2. Trigger each guard on purpose in a scratch branch: paste a fake key, edit a `.g.dart` or `Package.resolved`, run `git reset --hard` with an uncommitted change, add a lint suppression and find it in `mobile risk`.
 3. Run `scripts/sandbox-probe.sh` for your project's real build command. `03` reports that `xcodebuild` cannot be sandboxed; see it yourself, then decide your team's sandbox policy.
 4. Compare with a fail-closed harness such as [Keel](https://github.com/MarsXan/keel): what does that model buy, and what does it cost in friction?
 

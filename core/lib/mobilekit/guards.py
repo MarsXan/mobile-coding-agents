@@ -2,12 +2,15 @@
 
 `check_bash` looks at a shell command, `check_edit` at a file write. Each
 returns a Verdict: `deny` (do not do this), `ask` (a human must say yes),
-or nothing, optionally with context for the agent.
+or nothing, optionally with a note for the agent.
 
-Scope: the mobile-specific actions that permission rules cannot express
-robustly (store uploads, signing material, device data, schema files,
-hard-coded secrets, new suppressions). It is a tripwire for honest mistakes,
-not a security boundary: the OS sandbox and CI are the boundaries.
+A deny costs nobody any time: the agent reads the reason and takes the right
+route. An ask stops a person, so each one names a category and the project's
+`prompts` setting decides whether that category asks at all (config.asks).
+By default only the rare, hard-to-undo ones do.
+
+It is a tripwire for honest mistakes, not a security boundary: the OS sandbox
+and CI are the boundaries.
 """
 
 import os
@@ -21,21 +24,27 @@ _ORDER = {None: 0, ASK: 1, DENY: 2}
 
 
 class Verdict(object):
-    def __init__(self):
+    def __init__(self, asks=None):
         self.decision = None
         self.reasons = []
-        self.context = []
+        self.context = []          # (id, text): told to the agent, never to a person
+        self._asks = asks or (lambda category: True)
 
-    def add(self, decision, reason):
+    def add(self, decision, reason, category=None):
+        """Record a decision. An ask whose category is switched off is dropped: returns False."""
+        if decision == ASK and not self._asks(category):
+            return False
         if _ORDER[decision] > _ORDER[self.decision]:
             self.decision = decision
             self.reasons = [reason]
         elif decision == self.decision and reason not in self.reasons:
             self.reasons.append(reason)
+        return True
 
-    def note(self, text):
-        if text not in self.context:
-            self.context.append(text)
+    def note(self, text, ident=None):
+        """`ident` makes the note once-per-session; without one it is given every time."""
+        if (ident, text) not in self.context:
+            self.context.append((ident, text))
 
     @property
     def reason(self):
@@ -93,7 +102,28 @@ def _is_protected_branch(name, patterns):
     return bool(name) and util.any_glob(name, patterns) is not None
 
 
-def _check_git(cmd, verdict, config):
+def _current_branch(root):
+    code, out = util.git(root, "rev-parse", "--abbrev-ref", "HEAD", timeout=10)
+    return out.strip() if code == 0 else ""
+
+
+def _would_lose(root, args, what):
+    """Is there anything for this git command to destroy? When that cannot be
+    told (another repository is named, or git fails), assume there is."""
+    if any(a in _GIT_VALUE_FLAGS and a != "-c" for a in args):
+        return True
+    if what == "stash":
+        code, out = util.git(root, "stash", "list", timeout=10)
+        return code != 0 or bool(out.strip())
+    untracked = what == "untracked"
+    code, out = util.git(root, "status", "--porcelain", "--untracked-files=%s" % ("normal" if untracked else "no"), timeout=10)
+    if code != 0:
+        return True
+    lines = [line for line in out.splitlines() if line.strip()]
+    return any(line.startswith("??") for line in lines) if untracked else bool(lines)
+
+
+def _check_git(cmd, verdict, config, root):
     sub, rest = _git_subcommand(cmd.args)
     if not sub:
         return
@@ -104,30 +134,38 @@ def _check_git(cmd, verdict, config):
         deleting = _has_flag(rest, "d", ("--delete",)) or any(r.startswith(":") for r in refs)
         if forced or deleting:
             what = "Force push" if forced else "Remote branch deletion"
-            protected = [r for r in refs if _is_protected_branch(r, config["protectedBranches"])]
-            if protected:
+            every_branch = _has_flag(rest, None, ("--mirror", "--all", "--branches"))
+            # A bare `git push --force`, or one that names HEAD, pushes the branch that is checked out.
+            targets = [_current_branch(root) if r.lstrip("+") in ("HEAD", "@") else r for r in refs] or [_current_branch(root)]
+            protected = [r for r in targets if r and _is_protected_branch(r, config["protectedBranches"])]
+            if every_branch:
+                verdict.add(DENY, "%s of every branch rewrites shared history, protected branches included. Not done by an agent: ask the repository owner." % what)
+            elif protected:
                 verdict.add(DENY, "%s on a protected branch (%s) rewrites shared history. Not done by an agent: ask the repository owner." % (what, protected[0].lstrip("+:")))
             else:
-                verdict.add(ASK, "%s rewrites or removes remote history." % what)
+                verdict.add(ASK, "%s rewrites or removes remote history." % what, "force-push")
         if _has_flag(rest, None, ("--no-verify",)):
-            verdict.add(ASK, "`git push --no-verify` skips the pre-push checks.")
+            verdict.add(ASK, "`git push --no-verify` skips the pre-push checks.", "skip-checks")
     elif sub == "reset" and _has_flag(rest, None, ("--hard",)):
-        verdict.add(ASK, "`git reset --hard` discards uncommitted work.")
-    elif sub == "clean" and _has_flag(rest, "f", ("--force",)):
-        verdict.add(ASK, "`git clean -f` deletes untracked files that git cannot restore.")
+        if _would_lose(root, cmd.args, "tracked"):
+            verdict.add(ASK, "`git reset --hard` would discard uncommitted changes in this working tree.", "lost-work")
+    elif sub == "clean" and _has_flag(rest, "f", ("--force",)) and not _has_flag(rest, "n", ("--dry-run",)):
+        if _would_lose(root, cmd.args, "untracked"):
+            verdict.add(ASK, "`git clean -f` would delete untracked files that git cannot restore.", "lost-work")
     elif sub in ("checkout", "restore"):
         whole_tree = any(p in (".", ":/", "*", "./") for p in _positional(rest))
         only_staged = sub == "restore" and _has_flag(rest, "S", ("--staged",)) and not _has_flag(rest, "W", ("--worktree",))
-        if (whole_tree and not only_staged) or (sub == "checkout" and _has_flag(rest, "f", ("--force",))):
-            verdict.add(ASK, "`git %s` on the whole tree discards every uncommitted change." % sub)
+        if ((whole_tree and not only_staged) or (sub == "checkout" and _has_flag(rest, "f", ("--force",)))) and _would_lose(root, cmd.args, "tracked"):
+            verdict.add(ASK, "`git %s` on the whole tree would discard every uncommitted change." % sub, "lost-work")
     elif sub == "stash" and rest[:1] and rest[0] in ("drop", "clear"):
-        verdict.add(ASK, "`git stash %s` deletes stashed work." % rest[0])
+        if _would_lose(root, cmd.args, "stash"):
+            verdict.add(ASK, "`git stash %s` deletes stashed work." % rest[0], "lost-work")
     elif sub == "commit" and _has_flag(rest, "n", ("--no-verify",)):
-        verdict.add(ASK, "`git commit --no-verify` skips the commit hooks (lint, secret scan).")
+        verdict.add(ASK, "`git commit --no-verify` skips the commit hooks (lint, secret scan).", "skip-checks")
     elif sub in ("filter-branch", "filter-repo"):
-        verdict.add(ASK, "`git %s` rewrites history." % sub)
+        verdict.add(ASK, "`git %s` rewrites history." % sub, "lost-work")
     elif sub == "config" and any("hooksPath" in a for a in rest):
-        verdict.add(ASK, "Changing core.hooksPath disables the repository's git hooks.")
+        verdict.add(ASK, "Changing core.hooksPath disables the repository's git hooks.", "skip-checks")
 
 
 def _check_rm(cmd, verdict, root):
@@ -158,10 +196,10 @@ def _check_fastlane(cmd, verdict):
         if "nuke" in words:
             verdict.add(DENY, "`fastlane match nuke` revokes the team's certificates and profiles.")
         elif not any(re.match(r"^(--readonly|readonly:true)$", a) for a in args):
-            verdict.add(ASK, "`fastlane match` can create or revoke signing assets; use `--readonly` to only fetch.")
+            verdict.add(ASK, "`fastlane match` can create or revoke signing assets; use `--readonly` to only fetch.", "signing")
         return
     if any(_RELEASE_WORDS.search(w) for w in words):
-        verdict.add(ASK, "`fastlane %s` looks like a release lane: it can upload a build to TestFlight, the App Store or Google Play." % " ".join(words[:2]))
+        verdict.add(ASK, "`fastlane %s` looks like a release lane: it can upload a build to TestFlight, the App Store or Google Play." % " ".join(words[:2]), "publish")
 
 
 def _check_gradle(cmd, verdict):
@@ -170,7 +208,7 @@ def _check_gradle(cmd, verdict):
         if leaf.lower() == "publishtomavenlocal":
             continue
         if _GRADLE_PUBLISH.match(leaf):
-            verdict.add(ASK, "Gradle task `%s` publishes or uploads outside this machine." % task)
+            verdict.add(ASK, "Gradle task `%s` publishes or uploads outside this machine." % task, "publish")
 
 
 def _check_adb(cmd, verdict):
@@ -182,11 +220,11 @@ def _check_adb(cmd, verdict):
         return
     joined = " ".join(rest)
     if rest[0] == "uninstall" or re.search(r"\bpm\s+(clear|uninstall)\b", joined):
-        verdict.add(ASK, "`adb %s` deletes an app and its data from the connected device." % " ".join(rest[:3]))
+        verdict.add(ASK, "`adb %s` deletes an app and its data from the connected device." % " ".join(rest[:3]), "device-data")
     elif rest[0] == "shell" and re.search(r"\b(rm\s+-[a-z]*r|wipe|factory)", joined):
-        verdict.add(ASK, "`adb shell` command deletes data on the connected device.")
+        verdict.add(ASK, "`adb shell` command deletes data on the connected device.", "device-data")
     elif rest[0] == "reboot" and len(rest) > 1:
-        verdict.add(ASK, "`adb reboot %s` takes the device out of normal operation." % rest[1])
+        verdict.add(ASK, "`adb reboot %s` takes the device out of normal operation." % rest[1], "device-data")
 
 
 def _check_install(cmd, verdict):
@@ -211,27 +249,27 @@ def _check_install(cmd, verdict):
     elif prog == "claude" and positional[:2] in (["plugin", "install"], ["plugins", "install"], ["mcp", "add"]):
         reason = "`claude %s`" % " ".join(positional[:2])
     if reason:
-        verdict.add(ASK, "%s installs or runs third-party code on this machine. Vet the source and pin a version first." % reason)
+        verdict.add(ASK, "%s installs or runs third-party code on this machine. Vet the source and pin a version first." % reason, "install")
 
 
 def check_bash(command, config, root):
     """Return a Verdict for a shell command line."""
-    verdict = Verdict()
+    verdict = Verdict(config.asks)
     commands = shellscan.split(command or "")
     if commands is None:
         # Could not parse: scan the text. Unparseable plus risky words is worth a look.
         if re.search(r"\b(fastlane|altool|notarytool|simctl\s+(erase|delete)|pm\s+clear|--force|reset\s+--hard|rm\s+-[a-zA-Z]*r)", command):
-            verdict.add(ASK, "This command could not be parsed and contains a release or destructive keyword.")
+            verdict.add(ASK, "This command could not be parsed and contains a release or destructive keyword.", "unparsed")
         return verdict
     for cmd in commands:
         prog, args = cmd.prog, cmd.args
         positional = _positional(args)
         if cmd.sudo:
-            verdict.add(ASK, "`sudo %s` runs with administrator rights." % prog)
+            verdict.add(ASK, "`sudo %s` runs with administrator rights." % prog, "admin")
         if cmd.piped_from in ("curl", "wget") and prog in shellscan.SHELLS + ("python", "python3", "ruby", "node", "perl"):
-            verdict.add(ASK, "Piping a download into `%s` runs unreviewed code. Download, read, then run." % prog)
+            verdict.add(ASK, "Piping a download into `%s` runs unreviewed code. Download, read, then run." % prog, "admin")
         if prog == "git":
-            _check_git(cmd, verdict, config)
+            _check_git(cmd, verdict, config, root)
         elif prog == "rm":
             _check_rm(cmd, verdict, root)
         elif prog == "fastlane":
@@ -241,40 +279,40 @@ def check_bash(command, config, root):
         elif prog == "adb":
             _check_adb(cmd, verdict)
         elif prog == "fastboot":
-            verdict.add(ASK, "`fastboot` flashes or wipes a device.")
+            verdict.add(ASK, "`fastboot` flashes or wipes a device.", "device-data")
         elif prog == "simctl" and positional[:1] and positional[0] in ("erase", "delete"):
-            verdict.add(ASK, "`simctl %s` destroys simulator data (installed apps, their databases and keychains)." % positional[0])
+            verdict.add(ASK, "`simctl %s` destroys simulator data (installed apps, their databases and keychains)." % positional[0], "device-data")
         elif prog == "altool" and any(a in ("--upload-app", "--upload-package", "--notarize-app") for a in args):
-            verdict.add(ASK, "`altool` uploads a build to App Store Connect.")
+            verdict.add(ASK, "`altool` uploads a build to App Store Connect.", "publish")
         elif prog == "notarytool" and positional[:1] == ["submit"]:
-            verdict.add(ASK, "`notarytool submit` sends a build to Apple.")
+            verdict.add(ASK, "`notarytool submit` sends a build to Apple.", "publish")
         elif prog == "iTMSTransporter":
-            verdict.add(ASK, "`iTMSTransporter` uploads to App Store Connect.")
+            verdict.add(ASK, "`iTMSTransporter` uploads to App Store Connect.", "publish")
         elif prog == "xcodebuild":
             if "-allowProvisioningUpdates" in args:
-                verdict.add(ASK, "`-allowProvisioningUpdates` lets xcodebuild create profiles and register devices in the developer account.")
+                verdict.add(ASK, "`-allowProvisioningUpdates` lets xcodebuild create profiles and register devices in the developer account.", "signing")
             if "-exportArchive" in args and "-exportOptionsPlist" in args:
                 index = args.index("-exportOptionsPlist")
                 plist = util.read_text(os.path.join(root, args[index + 1])) if index + 1 < len(args) else ""
                 if re.search(r"<key>destination</key>\s*<string>upload</string>", plist):
-                    verdict.add(ASK, "This export uploads the archive to App Store Connect (ExportOptions destination is `upload`).")
+                    verdict.add(ASK, "This export uploads the archive to App Store Connect (ExportOptions destination is `upload`).", "publish")
         elif prog == "security":
             if positional[:1] and positional[0].startswith("delete-"):
                 verdict.add(DENY, "`security %s` removes keychain items used for code signing." % positional[0])
             elif positional[:1] and positional[0] in ("import", "create-keychain", "default-keychain", "set-key-partition-list", "set-keychain-settings"):
-                verdict.add(ASK, "`security %s` changes the keychain used for code signing." % positional[0])
+                verdict.add(ASK, "`security %s` changes the keychain used for code signing." % positional[0], "signing")
         elif prog == "keytool" and any(a in ("-delete", "-importkeystore", "-storepasswd", "-keypasswd", "-changealias", "-genkeypair", "-genkey", "-importcert") for a in args):
-            verdict.add(ASK, "`keytool` is about to change a keystore. Losing or overwriting a release key is not recoverable.")
+            verdict.add(ASK, "`keytool` is about to change a keystore. Losing or overwriting a release key is not recoverable.", "signing")
         elif prog == "firebase" and positional[:1] and re.match(r"^(deploy|appdistribution:distribute|crashlytics:(symbols|mappingfile):upload|hosting:.*)$", positional[0]):
-            verdict.add(ASK, "`firebase %s` publishes outside this machine." % positional[0])
+            verdict.add(ASK, "`firebase %s` publishes outside this machine." % positional[0], "publish")
         elif prog in ("flutter", "dart") and positional[:2] == ["pub", "publish"] and "--dry-run" not in args:
-            verdict.add(ASK, "`pub publish` releases a package to pub.dev permanently.")
+            verdict.add(ASK, "`pub publish` releases a package to pub.dev permanently.", "publish")
         elif prog == "pod" and positional[:2] in (["trunk", "push"], ["repo", "push"]):
-            verdict.add(ASK, "`pod %s` publishes a podspec." % " ".join(positional[:2]))
+            verdict.add(ASK, "`pod %s` publishes a podspec." % " ".join(positional[:2]), "publish")
         elif prog == "shorebird" and positional[:1] and positional[0] in ("release", "patch"):
-            verdict.add(ASK, "`shorebird %s` ships code to users' devices." % positional[0])
+            verdict.add(ASK, "`shorebird %s` ships code to users' devices." % positional[0], "publish")
         elif prog in ("gh", "glab") and positional[:1] == ["release"] and positional[1:2] and positional[1] in ("create", "delete", "upload", "edit"):
-            verdict.add(ASK, "`%s release %s` changes a public release." % (prog, positional[1]))
+            verdict.add(ASK, "`%s release %s` changes a public release." % (prog, positional[1]), "publish")
         _check_install(cmd, verdict)
     return verdict
 
@@ -343,7 +381,7 @@ def _count(pattern, text):
 
 def check_edit(tool_name, tool_input, config, root):
     """Return a Verdict for an Edit or Write call."""
-    verdict = Verdict()
+    verdict = Verdict(config.asks)
     path = tool_input.get("file_path") or tool_input.get("notebook_path") or ""
     rel = util.rel_to(root, path) if path else None
     if not rel:
@@ -358,10 +396,20 @@ def check_edit(tool_name, tool_input, config, root):
         if util.glob_match(rel, pattern):
             verdict.add(DENY, "%s is a lockfile and is only changed by its resolver. %s" % (rel, hint))
             return verdict
+    for pattern, why in config_module.SIGNING_MATERIAL:
+        if util.glob_match(rel, pattern):
+            verdict.add(DENY, (
+                "%s: %s It is made by its own tool (keytool, Keychain Access, the developer portal); "
+                "writing over it by hand destroys it." % (rel, why)))
+            return verdict
     if not name.endswith((".example", ".sample", ".template", ".dist")):
         for pattern, why in config.sensitive_rules():
             if util.glob_match(rel, pattern):
-                verdict.add(ASK, "%s: %s Editing it needs a person's approval." % (rel, why))
+                category = "own-config" if rel == config_module.CONFIG_NAME else "sensitive-files"
+                if not verdict.add(ASK, "%s: %s Editing it needs a person's approval." % (rel, why), category):
+                    verdict.note((
+                        "%s: %s Keep the change small and name it in your summary; "
+                        "`mobile risk` reports it for review." % (rel, why)), ident="sensitive:" + rel)
                 break
 
     if tool_name == "Write":
@@ -384,9 +432,12 @@ def check_edit(tool_name, tool_input, config, root):
     if verdict.decision != DENY:
         for label, pattern in _SUPPRESSIONS:
             if _count(pattern, new_text) > _count(pattern, old_text):
-                verdict.add(ASK, (
-                    "This edit adds %s. Fix the cause instead; if the suppression is truly right, the reason belongs "
-                    "next to it and a person should agree." % label))
+                if not verdict.add(ASK, (
+                        "This edit adds %s. Fix the cause instead; if the suppression is truly right, the reason belongs "
+                        "next to it and a person should agree." % label), "suppressions"):
+                    verdict.note((
+                        "This edit adds %s. Fix the cause where you can. If it has to stay, put the reason next to it "
+                        "and name it in your summary: `mobile risk` reports new suppressions for review." % label))
                 break
     return verdict
 

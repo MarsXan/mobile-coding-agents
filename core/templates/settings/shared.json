@@ -5,17 +5,20 @@
       "Bash(mobile verify *)",
       "Bash(mobile recon *)",
       "Bash(mobile risk *)",
-      "Bash(mobile doctor *)"
+      "Bash(mobile doctor *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git switch *)",
+      "Bash(git checkout -b *)",
+      "Bash(git fetch *)",
+      "Bash(git stash push *)",
+      "Bash(git stash pop *)"
     ],
     "ask": [
-      "Bash(git push *)",
-      "Bash(gh pr create *)",
-      "Bash(glab mr create *)",
-      "Bash(gh release *)",
-      "Bash(glab release *)",
-      "Bash(fastlane *)",
-      "Bash(bundle exec fastlane *)",
-      "Bash(firebase *)"
+      "Bash(gh release create *)",
+      "Bash(glab release create *)",
+      "Bash(firebase deploy *)",
+      "Bash(firebase appdistribution:distribute *)"
     ],
     "deny": [
       "Read(.env)",

@@ -4,4 +4,4 @@ Standard library only, Python 3.9+. Nothing here calls a model: every command
 prints the same answer for the same repository state.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

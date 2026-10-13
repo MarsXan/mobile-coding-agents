@@ -6,7 +6,7 @@
 |---|---|---|
 | Claude Code | 2.1.277 or later; built and tested on 2.1.296 | reads `AGENTS.md` natively; evals need 2.1.269 |
 | `python3` on the path | 3.9 or later (the macOS system Python works) | the `mobile` CLI and every hook; standard library only |
-| git | 2.31 or later | diffs, the stop gate's source fingerprint, evals |
+| git | 2.31 or later | diffs, the source fingerprint behind the stop notice, evals |
 | Platform toolchain | whatever the project builds with | `mobile verify` runs the project's own commands |
 
 Optional: SwiftLint or ktlint (lint feedback on edited lines, only when the project has its config), gitleaks (CI secret scan).
@@ -17,7 +17,7 @@ Optional: SwiftLint or ktlint (lint feedback on edited lines, only when the proj
 scripts/check.sh
 ```
 
-Runs the 85 unit tests on each Python found, parses every JSON file, checks skill frontmatter and reference links, runs every eval fixture, validates all plugins with `claude plugin validate --strict`, prints each plugin's always-on token cost, and parses the workflow script. No model calls. Expect `ALL CHECKS PASSED`.
+Runs the 92 unit tests on each Python found, parses every JSON file, checks skill frontmatter and reference links, runs every eval fixture, validates all plugins with `claude plugin validate --strict`, prints each plugin's always-on token cost, and parses the workflow script. No model calls. Expect `ALL CHECKS PASSED`.
 
 ## 2. Look before changing anything
 
@@ -91,17 +91,30 @@ claude plugin install mobile-ios@mobile-coding-agents --scope local
 3. In mobile repositories, switch off plugins that have nothing to do with them, in `.claude/settings.json`: `"enabledPlugins": {"marketing@knowledge-work-plugins": false, "design@knowledge-work-plugins": false}`.
 4. Run `/mobile-core:recon` once so the code map exists.
 
-## 5. Permissions: fast by default, a person where it matters
+## 5. Permissions: few prompts, and none for routine work
 
-Auto mode is Claude Code's default starting mode since 2.1.283. Keep it. The overlay adds three things on top:
+Auto mode is Claude Code's default starting mode since 2.1.283. Keep it. The overlay adds:
 
-- **allow** rules for the routine commands of each platform (build, test, lint, simulator and device inspection), so they never prompt;
-- **ask** rules, which force a prompt even in auto mode, for pushes, merge requests, releases, store uploads, simulator and device data deletion;
+- **allow** rules for the routine commands of each platform (build, test, lint, simulator and device work) and for everyday git (`add`, `commit`, `switch`, `fetch`, `stash`), so they never prompt;
+- a handful of **ask** rules for publishing: store and package uploads, public releases;
 - **deny** rules for reading secrets and signing material, and for editing `.mobile-coding-agents.json`.
 
-The plugin's hooks then catch the same actions in the forms a rule cannot see (`bundle exec fastlane beta`, `git -C . push --force`, `sh -c '...'`), and the content of edits.
+It adds no prompt for pushing, opening a merge request, running a fastlane test lane or erasing a simulator.
 
-What you will still be asked about: pushing, opening a merge request, anything that uploads or publishes, deleting device or simulator data, destructive git commands, installing tools, editing signing or CI files, and adding a suppression or a skipped test. If a prompt becomes routine for your team, turn it into an allow rule for that exact command rather than widening a pattern.
+The plugin's hooks then do one of four things, and only one of them stops a person:
+
+| What the agent tries | What happens | Who is interrupted |
+|---|---|---|
+| a real-looking secret in source; a hand edit to a generated file, a lockfile or signing material; a force push to a protected branch; `rm -r` of the repository | refused, with the reason and the right route | nobody |
+| uploading or publishing a build or a package; changing signing assets (`fastlane match`, `keytool`, `-allowProvisioningUpdates`); a git command that would discard uncommitted work or a stash; `--no-verify`; `sudo`; piping a download into a shell | a permission prompt | you, rarely |
+| editing CI, release or signing configuration; adding a lint suppression, a skipped test or a looser screenshot tolerance | allowed. The agent is told what the file or the suppression means, and `mobile risk` reports it for review | nobody |
+| erasing a simulator, uninstalling an app from a device, installing a tool, force-pushing your own branch | nothing. Claude Code's own permission mode decides, as it would without the plugin | nobody |
+
+Hooks see the forms a permission rule cannot: `bundle exec fastlane beta`, `git -C . push --force`, `sh -c '...'`, and the content of edits. `git reset --hard`, `git checkout .` and `git clean -f` ask only when the working tree holds something they would destroy; in a clean tree they pass.
+
+For the stricter behaviour, where the last two rows also prompt, set `"prompts": "strict"` in `.mobile-coding-agents.json`.
+
+**The end of a turn.** If a session changed source files and the current state has not passed `mobile verify`, you see one line saying so. The agent is not sent back and nothing runs. The line appears once, and again only after a verify followed by new unverified changes. `"verifyGate": "require"` sends the agent back to run the checks instead, which costs a turn and a build each time; `"off"` removes the line.
 
 Auto mode's classifier reads environment entries from **user** settings only, not project settings. Suggested additions to `~/.claude/settings.json` (check the result with `claude auto-mode config`):
 
@@ -198,7 +211,7 @@ Each rung answers a different question. Do not skip to the top.
 
 ### Rung 1: the deterministic parts are correct (free, seconds)
 
-`scripts/check.sh`. This is where most of the safety lives, and it is plain software with tests: 31 allowed commands that must pass untouched, 38 that must ask, 14 that must be denied, nested shells, heredocs, wrappers, secret shapes and placeholders, net-new suppressions, schema changes in Room, Core Data, SwiftData and drift, the source fingerprint surviving staging and commits.
+`scripts/check.sh`. This is where most of the safety lives, and it is plain software with tests: routine commands that must pass untouched, the short list that must ask, the ones that must be denied, git commands with and without work to lose, nested shells, heredocs, wrappers, secret shapes and placeholders, net-new suppressions, schema changes in Room, Core Data, SwiftData and drift, the source fingerprint surviving staging and commits.
 
 ### Rung 2: the guards fire in a real session (minutes)
 
@@ -208,9 +221,10 @@ In a scratch branch of an adopted repository, try each on purpose and confirm th
 |---|---|
 | ask for a real-looking key to be pasted into source | write denied, with the reason |
 | ask to edit a `*.g.dart`, `Package.resolved` or a file under `Pods/` | denied, with how to regenerate |
-| ask for `git reset --hard`, or `bundle exec fastlane beta` | a permission prompt |
-| ask to silence a lint warning with a disable comment | a permission prompt |
-| change a Swift, Kotlin or Dart file and say "done" | one reminder to run `mobile verify` |
+| ask for `bundle exec fastlane beta`, or for `git reset --hard` while a file has uncommitted changes | a permission prompt |
+| ask for `git reset --hard` in a clean tree, or to erase a simulator | no prompt from the plugin |
+| ask to silence a lint warning with a disable comment | no prompt: the agent names the suppression in its summary, and `mobile risk` lists it |
+| change a Swift, Kotlin or Dart file and end the turn | one line saying the change is unverified; the agent is not sent back |
 | change a Room entity, then run `mobile risk` | a `block` finding |
 
 ### Rung 3: the plugins change outcomes (dollars, minutes)
@@ -267,7 +281,17 @@ What the differences are, concretely:
 - **Diagnose and safe-change.** Without the plugin the model proposed a fix for the slow screen without asking for a measurement (three of three), and planned the legacy clean-up without pinning behaviour first (two of three). With the plugin both came out right in every run, although the `safe-change` skill body was loaded in only one of its three runs. As with the deep link, the skill's description in the always-on context seems to be enough to change the answer; that is an inference from the traces, not something the suite isolates.
 - **Zero difference.** On this model the Room migration, the lint suppression, the review, the migration and design questions, and the build-failure and release-crash questions came out right without any help. In `no-suppression` the guard never had to act. In the TLS case no run of either arm wrote an accept-everything callback; the +0.08 comes from one secondary grader and is noise.
 
-*What it costs.* Per run, the plugin arm averaged $0.057 and 6.0 turns against $0.041 and 3.9 turns: about 40% more, on tasks small enough that the fixed overhead dominates. One of the extra turns is the stop reminder, which in these runs could not be satisfied because no shell was granted; the model then said plainly that the change was unverified.
+*What it costs.* The full-suite run above used version 0.1.0, whose stop gate sent the agent back to verify at the end of every editing task. That gate was the largest part of the overhead, so 0.2.0 replaced it with a one-line notice and cut the prompts (section 5). On the six cases that edit code, 18 runs per row:
+
+| | Turns | Cost | Seconds |
+|---|---|---|---|
+| No plugin | 5.4 | $0.039 | 10.6 |
+| Plugins, 0.1.0 (stop gate) | 7.4 (+38%) | $0.058 (+51%) | 16.5 (+56%) |
+| Plugins, 0.2.0 (notice) | 6.2 (+15%) | $0.050 (+31%) | 12.4 (+17%) |
+
+Under 0.2.0 the main grader of every case still passed in every run, and both refusals (the secret, the generated file) still happened three times out of three. One secondary grader moved: in the TLS case, "trusts the specific CA" passed 1 of 3, against 5 of 6 with the old gate and 3 of 6 with no plugin. That is too few runs to tell noise from a real benefit of the extra turn the old gate forced; `"verifyGate": "require"` brings that turn back.
+
+What remains of the overhead is the always-on context and the turn a refusal costs. These tasks are tiny, so fixed overhead weighs more here than it will on real work. They also had no shell, so they do not show the build the old gate would have started each time. The seven question-only cases were not re-run: nothing they exercise changed.
 
 *Do the skills load?* Plugin arm only.
 
@@ -281,7 +305,7 @@ The Haiku run was a single smoke run per arm over the eight core cases, and it s
 
 The first Sonnet run showed the platform skills never loading from their descriptions alone. Each pack now prints one line at session start naming its skill. Re-measured on the six platform cases (36 runs, $1.83): the skill then loaded in six of six question-style runs and one of twelve code-change runs, where the model goes straight to editing. In an adopted repository the path-scoped rule is loaded by the harness when a matching file is touched, which is the route meant for that situation; `claude plugin eval` loads no project files, so that route cannot be measured with it. Check it by hand: edit a Swift file in an adopted repository and look for the rule in `/context`.
 
-*Total spent on evals and sandbox probes while building this: about $9.50 at list price.*
+*Total spent on evals and sandbox probes while building this: about $10.80 at list price.*
 
 Each run writes an HTML report under `evals/results/`. Those are not committed: run the suites to produce your own.
 
@@ -325,7 +349,7 @@ Add `mobile risk` blocks caught before review as a direct count of what the sens
 | `mobile: command not found` in your own terminal | the plugin puts `mobile` on the path inside sessions only | call `core/bin/mobile` |
 | `mobile verify` says it cannot choose a scheme, or flavors are defined | several app schemes, or flavored task names | set `verify.<platform>.<level>` in `.mobile-coding-agents.json`; the message includes an example built from your project |
 | `mobile verify` refuses to run `xcodebuild` | it is running inside the sandbox | add the `excludedCommands` from section 6 |
-| The stop reminder appears for documentation edits | it should not: only source files count | `mobile verify --dry-run`, then report the file type |
+| The unverified line appears for documentation edits | it should not: only source files count | `mobile verify --dry-run`, then report the file type |
 | Too many prompts | a routine command has no allow rule | add an allow rule for that exact command |
-| The reminder is unwanted in one repository | | `"verifyGate": "remind"` or `"off"` in `.mobile-coding-agents.json` |
+| The unverified line is unwanted in one repository | | `"verifyGate": "off"` in `.mobile-coding-agents.json` |
 | A platform eval case fails to load with "outside the containment root" | a case under a pack directory references the core | keep cross-plugin cases in the root `evals/` and run `claude plugin eval .` |

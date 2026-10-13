@@ -308,10 +308,19 @@ class VerifyRunTests(unittest.TestCase):
     def test_config_problems_are_reported(self):
         project = fixtures.ios_project(git=False)
         self.addCleanup(project.cleanup)
-        project.write(".mobile-coding-agents.json", '{"verifyGate": "sometimes", "nope": 1, "prLines": "many"}')
+        project.write(".mobile-coding-agents.json", '{"verifyGate": "sometimes", "prompts": "many", "nope": 1, "prLines": "many"}')
         config = config_module.load(project.root)
-        self.assertEqual(config["verifyGate"], "block")
-        self.assertEqual(len(config.problems), 3)
+        self.assertEqual(config["verifyGate"], "notice")
+        self.assertEqual(config["prompts"], "few")
+        self.assertEqual(len(config.problems), 4)
+
+    def test_defaults_do_not_hold_the_agent_or_stop_a_person_for_routine_work(self):
+        project = fixtures.ios_project(git=False)
+        self.addCleanup(project.cleanup)
+        config = config_module.load(project.root)
+        self.assertEqual((config["verifyGate"], config["prompts"]), ("notice", "few"))
+        self.assertTrue(config.asks("publish") and config.asks("lost-work"))
+        self.assertFalse(config.asks("device-data") or config.asks("install") or config.asks("suppressions"))
 
 
 if __name__ == "__main__":

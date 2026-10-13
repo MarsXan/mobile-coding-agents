@@ -65,7 +65,7 @@ xcrun simctl get_app_container booted <bundle id> data      # inspect files and 
 xcrun simctl spawn booted log stream --predicate 'subsystem == "<subsystem>"'
 ```
 
-`simctl erase` and `simctl delete` destroy simulator data and need a person's approval.
+`simctl erase` and `simctl delete` destroy simulator data: installed apps, their databases and keychains.
 
 ## CocoaPods status
 

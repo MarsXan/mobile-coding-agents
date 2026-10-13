@@ -3,7 +3,7 @@
 A mobile build log is thousands of lines; an agent needs the ten that say
 what failed. Each step's full output goes to a log file, and the terminal
 gets the diagnostics with file and line. On success the current source
-fingerprint is recorded, which is what the Stop gate compares against.
+fingerprint is recorded, which is what the stop hook compares against.
 """
 
 import hashlib

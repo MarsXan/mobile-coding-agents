@@ -42,15 +42,21 @@ LOCKFILES = [
     ("**/Gemfile.lock", "Change the Gemfile and run `bundle install`."),
 ]
 
-# Editing these needs a human yes: signing material, secrets, release and CI
-# configuration. A mistake here ships, leaks, or locks the team out.
-SENSITIVE = [
+# Signing material is made by its own tool (keytool, Keychain Access, the
+# developer portal). Writing over one by hand destroys it, so it is refused.
+SIGNING_MATERIAL = [
     ("**/*.jks", "Android signing keystore."),
     ("**/*.keystore", "Android signing keystore."),
     ("**/*.p12", "Signing certificate."),
     ("**/*.p8", "App Store Connect / APNs private key."),
     ("**/*.mobileprovision", "Provisioning profile."),
     ("**/*.provisionprofile", "Provisioning profile."),
+]
+
+# Credentials, release and CI configuration. Editing one is allowed: the agent
+# is told what the file is and `mobile risk` reports the change for review.
+# With `"prompts": "strict"` the edit needs a person's yes instead.
+SENSITIVE = [
     ("**/key.properties", "Android signing credentials."),
     ("**/keystore.properties", "Android signing credentials."),
     ("**/local.properties", "Machine-local Android settings; not shared."),
@@ -90,7 +96,8 @@ DEFAULTS = {
     "platforms": [],          # empty means auto-detect
     "baseBranch": "",         # empty means origin/HEAD, then main, master, develop
     "protectedBranches": ["main", "master", "develop", "release/*", "production"],
-    "verifyGate": "block",    # block | remind | off
+    "verifyGate": "notice",   # notice | require | off
+    "prompts": "few",         # few | strict
     "lintOnEdit": True,
     "verify": {},             # {"ios": {"quick": "...", "test": "...", "full": "..."}}
     "generated": [],
@@ -98,6 +105,13 @@ DEFAULTS = {
     "codemap": "docs/agent/CODEMAP.md",
     "prLines": 400,
 }
+
+
+# What still needs a person's yes with `"prompts": "few"`: an action that
+# leaves the machine for good, changes signing, would throw work away, or
+# skips the repository's own checks. Everything else in guards.py asks only
+# with `"prompts": "strict"`.
+FEW_PROMPTS = frozenset({"publish", "signing", "lost-work", "skip-checks", "admin", "own-config", "unparsed"})
 
 
 class Config(object):
@@ -115,6 +129,10 @@ class Config(object):
     def keel_adopted(self):
         """True when the project is governed by Keel: its gates take over."""
         return os.path.isfile(os.path.join(self.root, ".keel", "config.json"))
+
+    def asks(self, category):
+        """Does this kind of action need a person's yes under the configured `prompts`?"""
+        return self.data["prompts"] == "strict" or category in FEW_PROMPTS
 
     def generated_rules(self):
         return GENERATED + [(p, "Listed as generated in %s." % CONFIG_NAME) for p in self.data["generated"]]
@@ -146,9 +164,12 @@ def load(root):
             problems.append("%r in %s should be a %s" % (key, CONFIG_NAME, expected.__name__))
             continue
         data[key] = value
-    if data["verifyGate"] not in ("block", "remind", "off"):
-        problems.append("verifyGate must be block, remind or off; using block.")
-        data["verifyGate"] = "block"
+    if data["verifyGate"] not in ("notice", "require", "off"):
+        problems.append("verifyGate must be notice, require or off; using notice.")
+        data["verifyGate"] = "notice"
+    if data["prompts"] not in ("few", "strict"):
+        problems.append("prompts must be few or strict; using few.")
+        data["prompts"] = "few"
     config = Config(root, data)
     config.problems = problems
     return config

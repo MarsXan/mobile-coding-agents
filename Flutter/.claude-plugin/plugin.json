@@ -1,6 +1,6 @@
 {
   "name": "mobile-flutter",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Flutter expertise pack for the mobile-coding-agents toolkit: toolchain and native build failures, state and navigation migrations, platform interop, persistence, testing, performance, release gates",
   "author": { "name": "Mohsen" },
   "keywords": ["flutter", "dart"],
