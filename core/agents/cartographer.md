@@ -1,6 +1,6 @@
 ---
 name: cartographer
-description: Maps one area of an unfamiliar or legacy mobile codebase in its own context and returns a compact, cited map. Use for reading-heavy exploration of a large iOS, Android or Flutter repository or module before a change, refactor or migration, when that reading would otherwise fill the main conversation.
+description: Maps one area of an unfamiliar or legacy mobile codebase in its own context and returns a compact, cited map. Use for reading-heavy exploration of a large mobile repository or module before a change, refactor or migration, when that reading would otherwise fill the main conversation.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 color: cyan

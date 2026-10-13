@@ -252,6 +252,55 @@ def _check_install(cmd, verdict):
         verdict.add(ASK, "%s installs or runs third-party code on this machine. Vet the source and pin a version first." % reason, "install")
 
 
+_PACKAGE_RUNNERS = ("npx", "bunx", "pnpx")
+_PACKAGE_MANAGERS = ("npm", "pnpm", "yarn", "bun")
+_JS_RELEASE_TOOLS = ("eas", "eas-cli", "expo", "appcenter", "hot-updater")
+
+
+def _strip_version(name):
+    """`eas-cli@latest` -> `eas-cli`; `@expo/cli@1.2` -> `@expo/cli`."""
+    head, at, _ = name[1:].partition("@")
+    return name[0] + head if at else name
+
+
+def _through_runner(prog, args):
+    """`npx eas update` and `yarn eas update` run `eas update`: look through the package runner."""
+    index = 0
+    if prog in _PACKAGE_MANAGERS:
+        positional = _positional(args)
+        if not positional:
+            return prog, args
+        if positional[0] in ("dlx", "exec", "x"):
+            index = args.index(positional[0]) + 1
+        elif _strip_version(positional[0]) not in _JS_RELEASE_TOOLS:
+            return prog, args
+    elif prog not in _PACKAGE_RUNNERS:
+        return prog, args
+    while index < len(args) and args[index].startswith("-"):
+        index += 1
+    if index >= len(args):
+        return prog, args
+    return _strip_version(args[index]), args[index + 1:]
+
+
+def _check_js_release(prog, args, verdict):
+    positional = _positional(args)
+    first = positional[0] if positional else ""
+    if prog in ("eas", "eas-cli"):
+        if first == "submit" or (first == "build" and "--auto-submit" in args):
+            verdict.add(ASK, "`eas %s` uploads a build to App Store Connect or Google Play." % first, "publish")
+        elif first == "update":
+            verdict.add(ASK, "`eas update` ships new JavaScript to the apps users already have installed.", "publish")
+    elif prog == "expo" and first == "publish":
+        verdict.add(ASK, "`expo publish` ships new JavaScript to the apps users already have installed.", "publish")
+    elif prog == "appcenter" and first == "codepush" and positional[1:2] and positional[1].startswith("release"):
+        verdict.add(ASK, "`appcenter codepush %s` ships new JavaScript to the apps users already have installed." % positional[1], "publish")
+    elif prog == "hot-updater" and first == "deploy":
+        verdict.add(ASK, "`hot-updater deploy` ships new JavaScript to the apps users already have installed.", "publish")
+    elif prog in _PACKAGE_MANAGERS and "--dry-run" not in args and (first == "publish" or positional[:2] == ["npm", "publish"]):
+        verdict.add(ASK, "`%s publish` releases a package to the registry." % prog, "publish")
+
+
 def check_bash(command, config, root):
     """Return a Verdict for a shell command line."""
     verdict = Verdict(config.asks)
@@ -313,6 +362,7 @@ def check_bash(command, config, root):
             verdict.add(ASK, "`shorebird %s` ships code to users' devices." % positional[0], "publish")
         elif prog in ("gh", "glab") and positional[:1] == ["release"] and positional[1:2] and positional[1] in ("create", "delete", "upload", "edit"):
             verdict.add(ASK, "`%s release %s` changes a public release." % (prog, positional[1]), "publish")
+        _check_js_release(*(_through_runner(prog, args) + (verdict,)))
         _check_install(cmd, verdict)
     return verdict
 
@@ -379,6 +429,78 @@ def _count(pattern, text):
     return len(pattern.findall(text)) if text else 0
 
 
+def _generated_native_folder(root, rel):
+    """The `ios` or `android` folder of an Expo app that `expo prebuild` generates, if rel is inside one.
+
+    Such a folder is not kept in git: the app config is the source and the folder is rebuilt from it.
+    """
+    parts = rel.split("/")
+    for index, part in enumerate(parts[:-1]):
+        if part not in ("ios", "android"):
+            continue
+        package = util.read_json(os.path.join(root, *(parts[:index] + ["package.json"])), default=None)
+        if not isinstance(package, dict):
+            return None
+        deps = dict(package.get("dependencies") or {}, **(package.get("devDependencies") or {}))
+        folder = "/".join(parts[:index + 1])
+        if "expo" in deps and util.git(root, "check-ignore", "-q", folder, timeout=10)[0] == 0:
+            patched = "patch-project" in deps or os.path.isdir(os.path.join(root, *(parts[:index] + ["cng-patches"])))
+            return folder, patched
+        return None
+    return None
+
+
+# Kotlin Multiplatform: code in a common source set is compiled for every target
+# of its module, so an API that exists on one platform only cannot be used there.
+_COMMON_SOURCE_SET = re.compile(r"^(?P<module>.*?)/?src/common(?:Main|Test)/")
+_PLATFORM_ONLY_API = re.compile(r"^\s*import\s+(java|javax|android|platform)\.|\b(java|javax)\.(?:time|util|io|net|text|nio|math)\.[A-Z]", re.M)
+# `java.lang` needs no import on the JVM, so these read like plain Kotlin and still exist only there.
+_JAVA_LANG_CALL = re.compile(
+    r"\b(?:System\.(?:currentTimeMillis|nanoTime|getProperty|getenv|exit|arraycopy|identityHashCode)|Thread\.(?:sleep|currentThread)|"
+    r"String\.format|Math\.(?:round|abs|max|min|pow|sqrt|floor|ceil|random))\s*\(")
+_PERCENT_FORMAT = re.compile(r"\"[^\"\n]*%[^\"\n]*\"\s*\.format\s*\(")
+_KOTLIN_COMMENT = re.compile(r"//[^\n]*|/\*.*?\*/", re.S)
+_KMP_TARGET = re.compile(
+    r"\b(androidTarget|androidLibrary|jvm|iosArm64|iosSimulatorArm64|iosX64|macosArm64|macosX64|watchosArm64|tvosArm64|"
+    r"js|wasmJs|linuxX64|mingwX64)\s*[({]")
+_API_FAMILY = {"java": "jvm", "javax": "jvm", "android": "android", "platform": "apple"}
+
+
+def _target_family(target):
+    if target in ("androidTarget", "androidLibrary"):
+        return "android"
+    if target == "jvm":
+        return "jvm"
+    if target.startswith(("ios", "macos", "watchos", "tvos")):
+        return "apple"
+    return "other"
+
+
+def _platform_api_in_common_code(root, rel, new_text, old_text):
+    """(api, targets that lack it) when an edit brings a one-platform API into common code, else None."""
+    location = _COMMON_SOURCE_SET.match(rel)
+    if not location or not rel.endswith(".kt"):
+        return None
+    def apis(text):
+        code = _KOTLIN_COMMENT.sub("", text or "")
+        found = [m.group(1) or m.group(2) for m in _PLATFORM_ONLY_API.finditer(code)]
+        return found + ["java.lang (`%s`)" % m.group(0).rstrip("( ") for m in _JAVA_LANG_CALL.finditer(code)]
+
+    before = set(apis(old_text))
+    used = [api for api in apis(new_text) if api not in before]
+    if not used:
+        return None
+    module = location.group("module")
+    build = util.read_text(os.path.join(root, module, "build.gradle.kts")) or util.read_text(os.path.join(root, module, "build.gradle"))
+    targets = sorted(set(_KMP_TARGET.findall(build)))
+    api = used[0]
+    family = _API_FAMILY.get(api, "jvm")
+    # Android code may use java.*, so only a target outside both families is missing it.
+    has_it = ("jvm", "android") if family == "jvm" else (family,)
+    missing = [t for t in targets if _target_family(t) not in has_it]
+    return api, missing, bool(targets)
+
+
 def check_edit(tool_name, tool_input, config, root):
     """Return a Verdict for an Edit or Write call."""
     verdict = Verdict(config.asks)
@@ -396,6 +518,20 @@ def check_edit(tool_name, tool_input, config, root):
         if util.glob_match(rel, pattern):
             verdict.add(DENY, "%s is a lockfile and is only changed by its resolver. %s" % (rel, hint))
             return verdict
+    generated = _generated_native_folder(root, rel)
+    if generated and generated[1]:
+        verdict.note((
+            "%s is regenerated by `npx expo prebuild`. This project keeps hand edits as patches: run `npx patch-project` "
+            "after this edit, or it is lost on the next prebuild." % rel), ident="patch-project")
+    elif generated:
+        verdict.add(DENY, (
+            "%s is generated by `npx expo prebuild` in this project (the %s folder is not kept in git), so a hand edit is "
+            "lost on the next prebuild. Change app.json or app.config.*, or write a config plugin." % (rel, generated[0])))
+        return verdict
+    if "/node_modules/" in "/" + rel:
+        verdict.note((
+            "node_modules is replaced on the next install. This edit only lasts if it is captured as a patch "
+            "(`npx patch-package <package>`, `pnpm patch` or `yarn patch`) and the patch file is committed."), ident="node_modules")
     for pattern, why in config_module.SIGNING_MATERIAL:
         if util.glob_match(rel, pattern):
             verdict.add(DENY, (
@@ -429,6 +565,23 @@ def check_edit(tool_name, tool_input, config, root):
                 "Keep real secrets on a server; load build-time keys from an untracked file "
                 "(xcconfig, local.properties, --dart-define-from-file) that CI supplies." % label))
             break
+    common = _platform_api_in_common_code(root, rel, new_text, old_text)
+    if common:
+        api, missing, known = common
+        route = ("Use a multiplatform API (the Kotlin standard library, kotlinx or another multiplatform library), "
+                 "or declare `expect` here and write an `actual` in each platform source set.")
+        name = api if api.startswith("java.lang") else "`%s.*`" % api
+        if missing:
+            verdict.add(DENY, (
+                "This edit uses %s in common code, but this module also compiles for %s, where that API does not exist. %s"
+                % (name, ", ".join(missing[:4]), route)))
+        elif not known:
+            verdict.note("This edit uses %s in common code. It compiles only if every target of this module has that API. %s" % (name, route))
+    elif _COMMON_SOURCE_SET.match(rel) and rel.endswith(".kt") and _PERCENT_FORMAT.search(_KOTLIN_COMMENT.sub("", new_text)) \
+            and not _PERCENT_FORMAT.search(old_text):
+        verdict.note((
+            "`\"...%...\".format(...)` is a JVM-only function: in common code it compiles only if this project defines its own "
+            "`format`. Build the string by hand or use a multiplatform formatter."), ident="common-percent-format")
     if verdict.decision != DENY:
         for label, pattern in _SUPPRESSIONS:
             if _count(pattern, new_text) > _count(pattern, old_text):

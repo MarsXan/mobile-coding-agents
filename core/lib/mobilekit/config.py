@@ -40,6 +40,11 @@ LOCKFILES = [
     ("**/gradle.lockfile", "Change the dependency declaration and run `./gradlew dependencies --write-locks`."),
     ("**/Cartfile.resolved", "Change the Cartfile and run `carthage update`."),
     ("**/Gemfile.lock", "Change the Gemfile and run `bundle install`."),
+    ("**/package-lock.json", "Change package.json and run `npm install`."),
+    ("**/yarn.lock", "Change package.json and run `yarn install`."),
+    ("**/pnpm-lock.yaml", "Change package.json and run `pnpm install`."),
+    ("**/bun.lock", "Change package.json and run `bun install`."),
+    ("**/bun.lockb", "Change package.json and run `bun install`."),
 ]
 
 # Signing material is made by its own tool (keytool, Keychain Access, the
@@ -68,6 +73,7 @@ SENSITIVE = [
     ("fastlane/Appfile", "Store account configuration."),
     ("fastlane/Matchfile", "Signing repository configuration."),
     ("fastlane/Fastfile", "Release automation."),
+    ("**/eas.json", "Expo build, submit and update profiles."),
     (".mobile-coding-agents.json", "Defines the commands `mobile verify` runs and which guards are on."),
     (".gitlab-ci.yml", "CI pipeline: it runs with the pipeline's secrets."),
     (".github/workflows/**", "CI pipeline: it runs with the pipeline's secrets."),
@@ -91,6 +97,21 @@ SOURCE_NAMES = (
     "Package.swift", "Podfile", "pubspec.yaml", "AndroidManifest.xml",
     "analysis_options.yaml", "libs.versions.toml", "gradle.properties",
 )
+# JavaScript and TypeScript count as source only in a React Native project:
+# elsewhere they are build scripts or web assets that `mobile verify` does not check.
+JS_SOURCE_EXTENSIONS = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")
+JS_SOURCE_NAMES = ("package.json", "app.json", "tsconfig.json")
+
+
+def _uses_js(platforms):
+    return "react-native" in (platforms or ())
+
+
+def source_pathspecs(platforms=()):
+    """Git pathspecs for the files whose change makes a state unverified."""
+    extensions = SOURCE_EXTENSIONS + (JS_SOURCE_EXTENSIONS if _uses_js(platforms) else ())
+    names = SOURCE_NAMES + (JS_SOURCE_NAMES if _uses_js(platforms) else ())
+    return ["*" + ext for ext in extensions] + list(names) + ["*/" + name for name in names]
 
 DEFAULTS = {
     "platforms": [],          # empty means auto-detect
@@ -175,6 +196,8 @@ def load(root):
     return config
 
 
-def is_source(rel_path):
+def is_source(rel_path, platforms=()):
     name = rel_path.rsplit("/", 1)[-1]
-    return name.endswith(SOURCE_EXTENSIONS) or name in SOURCE_NAMES
+    if name.endswith(SOURCE_EXTENSIONS) or name in SOURCE_NAMES:
+        return True
+    return _uses_js(platforms) and (name.endswith(JS_SOURCE_EXTENSIONS) or name in JS_SOURCE_NAMES)

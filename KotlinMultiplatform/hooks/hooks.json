@@ -1,0 +1,21 @@
+{
+  "description": "One line at session start naming this pack's skill, so it is found without relying on description matching.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf",
+            "args": [
+              "%s\n",
+              "The Kotlin Multiplatform expertise pack is enabled in this repository. Its `mobile-kotlin-multiplatform:kotlin-multiplatform` skill has reference notes on source sets and what common code may use, the API that Swift sees, Gradle and Xcode integration, architecture for shared code, storage, and testing. The notes carry dated version facts and traps that general knowledge often gets wrong; the skill says which note matches a task."
+            ],
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

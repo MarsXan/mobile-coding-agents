@@ -114,7 +114,7 @@ def main(root, out=print):
         for line in detect.profile_lines(facts):
             out("     " + line)
     else:
-        report(INFO, "no iOS, Android or Flutter project detected here; the plugin's hooks stay silent")
+        report(INFO, "no mobile project detected here; the plugin's hooks stay silent")
     for problem in getattr(config, "problems", []):
         report(WARN, problem)
     if config.keel_adopted:
@@ -156,6 +156,19 @@ def main(root, out=print):
         report(OK if os.path.isdir(sdk) else FAIL, "Android SDK: %s" % (sdk if os.path.isdir(sdk) else "not found (set ANDROID_HOME)"))
         _tool(report, "adb", False, "device logs and installs")
         _tool(report, "ktlint", False, "lint feedback on edited Kotlin lines")
+    if "kotlin-multiplatform" in platforms:
+        if "android" not in platforms:
+            _tool(report, "java", True, "Gradle", ("-version",))
+        if any(t.startswith(("ios", "macos", "watchos", "tvos")) for t in (facts.get("kotlin-multiplatform") or {}).get("targets", [])):
+            _tool(report, "xcodebuild", True, "compiling the Apple targets of the shared code", ("-version",))
+    if "react-native" in platforms:
+        rn = facts.get("react-native") or {}
+        _tool(report, "node", True, "everything in a React Native project", ("--version",))
+        manager = rn.get("packageManager") or "npm"
+        _tool(report, manager, True, "installing dependencies and running scripts", ("--version",))
+        if os.path.isfile(os.path.join(root, rn.get("root") or ".", "ios", "Podfile")):
+            _tool(report, "pod", True, "installing the iOS dependencies", ("--version",))
+        _tool(report, "watchman", False, "fast file watching for Metro", ("--version",))
     if "flutter" in platforms:
         _tool(report, "flutter", True, "building Flutter")
         _tool(report, "dart", True, "analysis and tests")

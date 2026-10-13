@@ -1,6 +1,6 @@
 # Learning roadmap: from using an agent to leading a team that does
 
-This is for a mobile engineer who already uses a coding agent every day and is about to lead a team that does. What a team lead needs on top of daily use is narrower than "learn everything": be able to say **why** each piece of the setup exists, **measure** whether it works, and **teach** it to people on three platforms.
+This is for a mobile engineer who already uses a coding agent every day and is about to lead a team that does. What a team lead needs on top of daily use is narrower than "learn everything": be able to say **why** each piece of the setup exists, **measure** whether it works, and **teach** it to people on platforms you know less well than your own.
 
 Each stage has an outcome, exercises on your own code, and a test for moving on. The order is by payoff. Weeks are a guide for evenings-and-margins effort, not a schedule.
 
@@ -28,6 +28,7 @@ Do, in the project you know best:
 2. `/mobile-core:recon` on one feature area. Read the code map it writes and correct it. The corrections show you what an agent gets wrong about your codebase.
 3. One real ticket through `mobile-core:safe-change` on a legacy screen: characterization test first, then the change. Notice where it wanted to do more than you asked.
 4. Use plan mode for one change and skip it for a similar one. Compare the diffs.
+5. Run `core/bin/mobile detect` and read the architecture line. It is counted from file names, so check it against what you know: a folder of `*Presenter` files that nobody extends any more still counts. Then give the agent one small task in a coordinator or VIPER feature and see whether the new code stays inside the pattern.
 
 **Move on when** you can predict, before pressing return, whether a prompt will need a plan, a subagent, or neither.
 
@@ -90,11 +91,12 @@ Do:
 **Outcome.** You can review agent-written Android and Flutter code for the failure modes that matter, even where you would not write that code fastest yourself.
 
 - Install the toolchains you do not have yet. `mobile doctor` tells you what is missing.
-- For each platform, read that pack's `SKILL.md` list of "mistakes to expect", then its `legacy.md` and `persistence.md`. Those two files carry most of the production risk.
+- For each platform, read that pack's `SKILL.md` list of "mistakes to expect", then its `legacy.md` and `persistence.md`. Those two files carry most of the production risk. Read `architecture.md` next: it tells you which pattern a file name belongs to and where new behaviour goes in each.
 - Build one small feature per platform with the pack enabled: a screen with state that must survive rotation, a stored model with one migration, a list with real data. Then break it on purpose (kill the process, rotate, switch to dark theme and a large font) and see what the agent missed.
 - Run the Android and Flutter eval cases on your model. They were written on a machine with no Android toolchain, so they check the files an agent writes, not a build: extend them to run yours.
 - Read one benchmark result page critically: [Android Bench](https://developer.android.com/bench). Note what kind of task still fails; that is where your review attention goes.
 - For depth, add one specialist skill per platform from `01-shortlist.md` and measure it the same way you measured your own.
+- If the team also ships React Native or Kotlin Multiplatform, do the same with those packs. Start with `legacy.md` and `native.md` for React Native, and with `shared-code.md` and `swift-api.md` for Kotlin Multiplatform. Neither pack was built or run on the machine this toolkit was written on, so treat their notes as a dated reference and add an eval case for each real incident.
 
 **Move on when** you can read an Android or Flutter merge request written by an agent and name the two things most likely to be wrong before opening the diff.
 

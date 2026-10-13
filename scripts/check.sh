@@ -73,13 +73,13 @@ echo "checked $(find core/evals evals -name fixture.sh | wc -l | tr -d ' ') fixt
 
 if command -v claude >/dev/null 2>&1; then
   step "claude plugin validate --strict"
-  for target in . core iOS Android Flutter; do
+  for target in . core iOS Android Flutter ReactNative KotlinMultiplatform; do
     if claude plugin validate "$target" --strict >/dev/null 2>&1; then echo "ok   $target"; else echo "FAIL $target"; claude plugin validate "$target" --strict 2>&1 | tail -8; fail=1; fi
   done
 
   step "Always-on context cost (claude plugin details)"
   claude --plugin-dir core plugin details mobile-core 2>/dev/null | grep -E 'Always-on' | sed 's/^ */mobile-core:    /'
-  for pair in iOS:mobile-ios Android:mobile-android Flutter:mobile-flutter; do
+  for pair in iOS:mobile-ios Android:mobile-android Flutter:mobile-flutter ReactNative:mobile-react-native KotlinMultiplatform:mobile-kotlin-multiplatform; do
     claude --plugin-dir core --plugin-dir "${pair%%:*}" plugin details "${pair##*:}" 2>/dev/null | grep -E 'Always-on' | sed "s/^ */${pair##*:}: /"
   done
 else

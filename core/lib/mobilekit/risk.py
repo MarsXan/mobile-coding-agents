@@ -14,7 +14,7 @@ import os
 import re
 
 from . import config as config_module
-from . import guards, util
+from . import detect, guards, util
 
 BLOCK, WARN, INFO = "block", "warn", "info"
 _RANK = {BLOCK: 0, WARN: 1, INFO: 2}
@@ -40,6 +40,10 @@ _MIN_VERSION = re.compile(
 _DEP_LINE = re.compile(
     r"\.package\(\s*(?:url|path|name):|^\s*pod\s+['\"]|\b(?:implementation|api|kapt|ksp|testImplementation|androidTestImplementation|"
     r"debugImplementation|compileOnly|runtimeOnly)\s*\(?\s*[\"'(]|^\s*[\w.-]+\s*=\s*\{\s*(?:module|group)\s*=|^  [a-z_0-9]+:\s*[\^\"'\d<>=a]", re.M)
+_SQLDELIGHT_SCHEMA = re.compile(r"^\s*(?:CREATE|ALTER|DROP)\s+(?:TABLE|INDEX|VIEW|TRIGGER|VIRTUAL)\b|^\s+\w+\s+(?:INTEGER|TEXT|REAL|BLOB)\b", re.I)
+_JS_DEPENDENCY = re.compile(r'^\s*"[@\w./-]+"\s*:\s*"(?:[\^~<>=]*\d+\.|\*|latest|workspace:|npm:|github:|file:|link:|patch:)')
+_JS_PLATFORM_VERSION = re.compile(r'^\s*"(?:react-native|expo|react|packageManager|node)"\s*:')
+_APP_CONFIG = ("app.json", "app.config.js", "app.config.ts")
 _SHRINK_LOOSEN = re.compile(r"^\s*-(?:dontobfuscate|dontoptimize|dontshrink|ignorewarnings|keep\s+class\s+\*\*|keep\s+class\s+\*\s*\{|dontwarn\s+\*\*)", re.M)
 _DEBUG_LEFTOVER = re.compile(r"^\s*(?:print\(|debugPrint\(|NSLog\(|Log\.[dv]\(|println\(|console\.log\()")
 
@@ -203,6 +207,14 @@ def _schema_findings(root, changes):
             "drift schemaVersion was raised but no migration step (onUpgrade / stepByStep / m.addColumn...) was added."),
             [c.path for c in live if c.path.endswith(".dart") and any(_DRIFT_VERSION.search(l) for l in c.added)]))
 
+    # SQLDelight: .sq files hold the current schema, numbered .sqm files migrate installed databases to it
+    sqldelight = [c.path for c in live if c.path.endswith(".sq") and any(_SQLDELIGHT_SCHEMA.search(l) for l in c.added + c.removed)]
+    if sqldelight and not any(c.path.endswith(".sqm") for c in live):
+        findings.append(Finding("schema-sqldelight-no-migration", WARN, (
+            "A SQLDelight table definition changed and no migration file (.sqm) is in the diff. Installed apps keep the "
+            "old tables: add the next numbered .sqm file and verify it (`verifyMigrations`), unless this schema has "
+            "never shipped."), sqldelight))
+
     # Hive: field indexes are the stored format
     hive = [c.path for c in live if c.path.endswith(".dart") and any("@HiveField(" in l for l in c.removed)]
     if hive:
@@ -258,6 +270,20 @@ def _capability_findings(changes):
         elif name == "PrivacyInfo.xcprivacy":
             flags.append("privacy manifest changed")
             files.append(change.path)
+        elif name in _APP_CONFIG:
+            # An Expo app declares permissions and URL schemes here; prebuild writes them into the native projects.
+            keys = re.findall(r"\b(NS\w+UsageDescription)\b", added)
+            usage_keys += keys
+            found = re.findall(r"\b(?:android\.permission\.)([A-Z_]+)\b", added)
+            permissions += found
+            local = [label for needle, label in (
+                ("usesCleartextTraffic", "cleartext HTTP allowed"),
+                ("NSAllowsArbitraryLoads", "App Transport Security exception"),
+                ('"scheme"', "a deep-link scheme"), ("scheme:", "a deep-link scheme"),
+                ("UIBackgroundModes", "a background mode")) if needle in added]
+            flags += local
+            if keys or found or local:
+                files.append(change.path)
     if permissions or usage_keys or flags:
         parts = []
         if permissions:
@@ -272,7 +298,7 @@ def _capability_findings(changes):
     return findings
 
 
-def _quality_findings(root, changes, config):
+def _quality_findings(root, changes, config, platforms=()):
     findings = []
     live = [c for c in changes.values() if c.status != "D"]
 
@@ -323,6 +349,8 @@ def _quality_findings(root, changes, config):
 
     versions = [c.path for c in live if any(_MIN_VERSION.search(l) for l in c.added + c.removed)
                 and c.path.rsplit("/", 1)[-1] in ("project.pbxproj", "Package.swift", "Podfile", "pubspec.yaml", "libs.versions.toml", "build.gradle", "build.gradle.kts", "gradle.properties")]
+    versions += [c.path for c in live if c.path.rsplit("/", 1)[-1] == "package.json"
+                 and any(_JS_PLATFORM_VERSION.search(l) for l in c.added + c.removed)]
     if versions:
         findings.append(Finding("toolchain-or-min-version", WARN, (
             "A minimum OS version, SDK level or toolchain version changed. Raising a minimum drops users on older "
@@ -343,6 +371,8 @@ def _quality_findings(root, changes, config):
 
     manifests = ("Package.swift", "Podfile", "pubspec.yaml", "libs.versions.toml", "build.gradle", "build.gradle.kts")
     dep_files = [c.path for c in live if c.path.rsplit("/", 1)[-1] in manifests and any(_DEP_LINE.search(l) for l in c.added)]
+    dep_files += [c.path for c in live if c.path.rsplit("/", 1)[-1] == "package.json"
+                  and any(_JS_DEPENDENCY.search(l) and not _JS_PLATFORM_VERSION.search(l) for l in c.added)]
     if dep_files:
         findings.append(Finding("dependency-change", INFO, "Dependencies were added or changed. Check licence, maintenance, binary size and whether the platform already provides it.", dep_files))
     locks = [c.path for c in live if util.any_glob(c.path, [p for p, _ in config_module.LOCKFILES])]
@@ -358,7 +388,7 @@ def _quality_findings(root, changes, config):
         findings.append(Finding("debug-output", INFO, "Debug print statements were added in non-test code.", leftovers))
 
     source_lines = sum(len(c.added) + len(c.removed) for c in changes.values()
-                       if config_module.is_source(c.path) and not util.any_glob(c.path, [p for p, _ in config.generated_rules()]))
+                       if config_module.is_source(c.path, platforms) and not util.any_glob(c.path, [p for p, _ in config.generated_rules()]))
     if source_lines > config["prLines"]:
         findings.append(Finding("large-change", WARN, (
             "This change touches %d source lines (limit %d). Large changes are reviewed worse and fail more often; "
@@ -370,7 +400,8 @@ def analyze(root, base=None):
     config = config_module.load(root)
     resolved = resolve_base(root, config, base)
     changes = collect_changes(root, resolved)
-    findings = _schema_findings(root, changes) + _capability_findings(changes) + _quality_findings(root, changes, config)
+    platforms = config["platforms"] or detect.detect(root)["platforms"]
+    findings = _schema_findings(root, changes) + _capability_findings(changes) + _quality_findings(root, changes, config, platforms)
     findings.sort(key=lambda f: (_RANK[f.severity], f.ident))
     return resolved, changes, findings
 

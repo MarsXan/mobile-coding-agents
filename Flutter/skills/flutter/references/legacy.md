@@ -20,7 +20,7 @@ Every migration here goes through `mobile-core:migrate`: inventory, coexistence 
 
 **Provider to Riverpod.** Both can live in the tree together (`ProviderScope` above the existing providers). `context.watch`, `read` and `select` become `ref.watch`, `ref.read` and `ref.watch(p.select(...))`; a `ProxyProvider` becomes a provider that watches others.
 
-**Riverpod 2 to 3 and BLoC major versions.** Read the migration guide for the exact versions. They change behaviour as well as names: Riverpod 3 retries failed providers by default and wraps errors; BLoC since version 8 handles events concurrently unless a transformer says otherwise, where older code relied on sequential handling. Pin the old behaviour explicitly (`sequential()`, retry off) and test error paths before changing anything else.
+**Riverpod 2 to 3 and BLoC major versions.** Read the migration guide for the exact versions. They change behaviour as well as names: Riverpod 3 retries failed providers by default and wraps errors; BLoC since version 7.2 handles events concurrently unless a transformer says otherwise, where older code relied on sequential handling. Pin the old behaviour explicitly (`sequential()`, retry off) and test error paths before changing anything else.
 
 ## Navigation: Navigator 1.0 to go_router
 

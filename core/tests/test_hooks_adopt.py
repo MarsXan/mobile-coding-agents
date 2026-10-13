@@ -193,7 +193,7 @@ class DoctorTests(unittest.TestCase):
         project = fixtures.Project(git=False)
         self.addCleanup(project.cleanup)
         _, text = self.run_doctor(project)
-        self.assertIn("no iOS, Android or Flutter project detected", text)
+        self.assertIn("no mobile project detected", text)
 
 
 class AdoptTests(unittest.TestCase):

@@ -1,0 +1,21 @@
+{
+  "description": "One line at session start naming this pack's skill, so it is found without relying on description matching.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf",
+            "args": [
+              "%s\n",
+              "The React Native expertise pack is enabled in this repository. Its `mobile-react-native:react-native` skill has reference notes on Expo and bare builds, upgrades and the New Architecture, native modules, architecture and navigation, storage, testing, performance, and release with over-the-air updates. The notes carry dated version facts and traps that general knowledge often gets wrong; the skill says which note matches a task."
+            ],
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

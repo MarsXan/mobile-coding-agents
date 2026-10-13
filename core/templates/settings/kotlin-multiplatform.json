@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew *)"
+    ],
+    "ask": [
+      "Bash(./gradlew *publish*)",
+      "Bash(./gradlew *Publish*)",
+      "Bash(./gradlew *upload*)",
+      "Bash(./gradlew *Upload*)"
+    ],
+    "deny": []
+  }
+}

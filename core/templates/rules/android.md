@@ -22,4 +22,4 @@ Facts first: the session-start profile lists this project's minSdk, compile and 
 - **Build.** Change versions in the version catalog, one upgrade per change. Do not add `-dontwarn`, broad `-keep` rules, lint-baseline entries or `@Suppress` to get a green build.
 - **Accessibility is part of done** for a UI change: content descriptions, 48dp targets, text scales, sensible TalkBack order.
 
-Detail is in the `mobile-android:android` skill. Load the reference for the task: `build.md` (Gradle, AGP, R8), `legacy.md` (Views, Java, RxJava and LiveData migrations, Compose interop), `concurrency.md`, `persistence.md`, `testing.md`, `performance.md`, `release.md` (security, accessibility, Play requirements).
+Detail is in the `mobile-android:android` skill. Load the reference for the task: `build.md` (Gradle, AGP, R8), `legacy.md` (Views, Java, RxJava and LiveData migrations, Compose interop), `architecture.md` (state holders, layering, navigation structure), `modules.md` (dependency injection, modules, build logic), `concurrency.md`, `persistence.md`, `testing.md`, `performance.md`, `release.md` (security, accessibility, Play requirements).

@@ -1,6 +1,6 @@
 {
   "name": "mobile-coding-agents",
-  "description": "Agentic engineering toolkit for iOS, Android and Flutter teams: a deterministic core plus one expertise pack per platform",
+  "description": "Agentic engineering toolkit for iOS, Android, Flutter, React Native and Kotlin Multiplatform teams: a deterministic core plus one expertise pack per platform",
   "owner": {
     "name": "Mohsen"
   },
@@ -10,28 +10,69 @@
       "source": "./core",
       "description": "Cross-platform workflows (recon, safe change, migration, debugging, performance, review, design, release), two isolated agents, guard hooks and the `mobile` CLI",
       "category": "development",
-      "tags": ["mobile", "guardrails", "legacy", "migration", "review"]
+      "tags": [
+        "mobile",
+        "guardrails",
+        "legacy",
+        "migration",
+        "review"
+      ]
     },
     {
       "name": "mobile-ios",
       "source": "./iOS",
       "description": "iOS expertise pack: build and signing, UIKit and Objective-C legacy, Swift concurrency migration, persistence migrations, testing, performance, release gates",
       "category": "development",
-      "tags": ["ios", "swift", "swiftui", "uikit"]
+      "tags": [
+        "ios",
+        "swift",
+        "swiftui",
+        "uikit"
+      ]
     },
     {
       "name": "mobile-android",
       "source": "./Android",
       "description": "Android expertise pack: Gradle and AGP, Views and Java legacy, coroutines and lifecycle, Room migrations, Compose interop, testing, performance, release gates",
       "category": "development",
-      "tags": ["android", "kotlin", "compose", "gradle"]
+      "tags": [
+        "android",
+        "kotlin",
+        "compose",
+        "gradle"
+      ]
     },
     {
       "name": "mobile-flutter",
       "source": "./Flutter",
       "description": "Flutter expertise pack: toolchain and native build failures, state-management and navigation migrations, platform interop, persistence migrations, testing, performance, release gates; wires the Dart language server",
       "category": "development",
-      "tags": ["flutter", "dart"]
+      "tags": [
+        "flutter",
+        "dart"
+      ]
+    },
+    {
+      "name": "mobile-react-native",
+      "source": "./ReactNative",
+      "description": "React Native expertise pack: Expo and bare builds, upgrades and the New Architecture, native modules, navigation and state, storage, testing, performance, release and over-the-air updates",
+      "category": "development",
+      "tags": [
+        "react-native",
+        "expo",
+        "typescript"
+      ]
+    },
+    {
+      "name": "mobile-kotlin-multiplatform",
+      "source": "./KotlinMultiplatform",
+      "description": "Kotlin Multiplatform expertise pack: source sets and common code, the Swift-facing API, Gradle and Xcode integration, architecture for shared code, storage, testing",
+      "category": "development",
+      "tags": [
+        "kotlin",
+        "kotlin-multiplatform",
+        "compose-multiplatform"
+      ]
     }
   ]
 }

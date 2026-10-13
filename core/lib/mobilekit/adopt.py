@@ -15,7 +15,8 @@ from . import config as config_module
 from . import detect, util
 
 MARKETPLACE = "mobile-coding-agents"
-PLATFORMS = ("ios", "android", "flutter")
+PLATFORMS = ("ios", "android", "flutter", "react-native", "kotlin-multiplatform")
+NAMES = {"ios": "iOS", "android": "Android", "flutter": "Flutter", "react-native": "React Native", "kotlin-multiplatform": "Kotlin Multiplatform"}
 
 
 def templates_dir():
@@ -75,7 +76,8 @@ def plan(target, platforms, marketplace=None):
     name = os.path.basename(os.path.abspath(target))
     values = {
         "PROJECT": name,
-        "PLATFORMS": ", ".join({"ios": "iOS", "android": "Android", "flutter": "Flutter"}[p] for p in platforms) or "mobile",
+        "PLATFORMS": ", ".join(NAMES[p] for p in platforms) or "mobile",
+        "SKILLS": ", ".join("`mobile-%s:%s`" % (p, p) for p in platforms) or "`mobile-<platform>:<platform>`",
     }
     source, local = _marketplace_source(marketplace)
     files = []
@@ -84,7 +86,9 @@ def plan(target, platforms, marketplace=None):
     files.append(("CLAUDE.md", _render(util.read_text(os.path.join(tdir, "CLAUDE.md")), values)))
     files.append((config_module.CONFIG_NAME, _render(util.read_text(os.path.join(tdir, "mobile-coding-agents.json")), values)))
     for platform in platforms:
-        files.append((".claude/rules/mobile-%s.md" % platform, util.read_text(os.path.join(tdir, "rules", "%s.md" % platform))))
+        rule = util.read_text(os.path.join(tdir, "rules", "%s.md" % platform))
+        if rule.strip():
+            files.append((".claude/rules/mobile-%s.md" % platform, rule))
     settings = build_settings(platforms, None if local else source)
     files.append((".claude/settings.json", json.dumps(settings, indent=2) + "\n"))
     if local:
@@ -122,7 +126,7 @@ def main(target, platforms=None, marketplace=None, merge_settings=False, dry_run
         return 2
     chosen, files, local = plan(target, platforms, marketplace)
     if not chosen:
-        out("mobile adopt: no iOS, Android or Flutter project found in %s. Pass --platforms ios,android,flutter to adopt anyway." % target)
+        out("mobile adopt: no mobile project found in %s. Pass --platforms (%s) to adopt anyway." % (target, ",".join(PLATFORMS)))
         return 2
     out("mobile adopt · %s · platforms: %s%s" % (target, ", ".join(chosen), " · dry run" if dry_run else ""))
     for rel, content in files:

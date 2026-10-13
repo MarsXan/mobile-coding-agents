@@ -28,11 +28,12 @@ BUNDLE_SUFFIXES = (
 MAX_WALK_ENTRIES = 60000
 
 # Test code by convention: an `AppTests/` or `AppUITests/` target, `src/test`,
-# `src/androidTest`, `test/`, `integration_test/`, or a `*Tests.swift`,
-# `*Test.kt`, `*_test.dart` file.
+# `src/androidTest`, `src/commonTest`, `test/`, `integration_test/`,
+# `__tests__/`, or a `*Tests.swift`, `*Test.kt`, `*_test.dart`, `*.test.tsx`
+# or `*.spec.ts` file.
 TEST_PATH = re.compile(
-    r"(^|/)(?:[A-Za-z0-9_]*(?:Tests|UITests|Test)|tests?|androidTest|integration_test|test_driver|testFixtures)(/|$)"
-    r"|Tests?\.(?:swift|kt|java|m)$|_test\.dart$")
+    r"(^|/)(?:[A-Za-z0-9_]*(?:Tests|UITests|Test)|tests?|__tests__|androidTest|integration_test|test_driver|testFixtures)(/|$)"
+    r"|Tests?\.(?:swift|kt|java|m)$|_test\.dart$|\.(?:test|spec)\.(?:ts|tsx|js|jsx)$")
 
 
 def walk(root, max_depth=8, max_entries=MAX_WALK_ENTRIES, skip_dirs=SKIP_DIRS):

@@ -40,11 +40,31 @@ def _yaml_section_keys(text, section):
     return keys
 
 
+# File names that say which architecture a codebase uses. Counting names costs
+# nothing extra (the tree is walked anyway), so the pattern can be a session fact.
+_MARKERS = (
+    ("coordinators", re.compile(r"Coordinator\.swift$")),
+    ("routers", re.compile(r"Router\.swift$")),
+    ("presenters", re.compile(r"Presenter\.(?:swift|kt)$")),
+    ("interactors", re.compile(r"Interactor\.swift$")),
+    ("view models", re.compile(r"ViewModel\.(?:swift|kt)$|_view_?model\.dart$")),
+    ("use cases", re.compile(r"UseCase\.(?:swift|kt)$|_use_?case\.dart$")),
+    ("repositories", re.compile(r"Repository(?:Impl)?\.(?:swift|kt)$|_repository\.dart$")),
+    ("blocs and cubits", re.compile(r"_(?:bloc|cubit)\.dart$")),
+)
+
+
+_SINGULAR = {
+    "coordinators": "coordinator", "routers": "router", "presenters": "presenter", "interactors": "interactor",
+    "view models": "view model", "use cases": "use case", "repositories": "repository", "blocs and cubits": "bloc or cubit",
+}
+
+
 def _collect(root):
     found = {
         "pubspec": [], "xcodeproj": [], "xcworkspace": [], "package_swift": [],
         "podfile": [], "settings_gradle": [], "build_gradle": [], "manifest": [],
-        "xcconfig": [], "counts": {}, "names": set(),
+        "xcconfig": [], "package_json": [], "kmp_modules": [], "counts": {}, "names": set(), "markers": {},
     }
     counts = found["counts"]
     for rel, is_dir in util.walk(root, max_depth=14):
@@ -54,9 +74,16 @@ def _collect(root):
                 found["xcodeproj"].append(rel)
             elif name.endswith(".xcworkspace"):
                 found["xcworkspace"].append(rel)
+            elif name == "commonMain" and os.path.basename(os.path.dirname(rel)) == "src":
+                found["kmp_modules"].append(os.path.dirname(os.path.dirname(rel)))
             continue
         ext = os.path.splitext(name)[1]
         counts[ext] = counts.get(ext, 0) + 1
+        if ext in (".swift", ".kt", ".dart") and not util.TEST_PATH.search(rel.replace(os.sep, "/")):
+            for label, pattern in _MARKERS:
+                if pattern.search(name):
+                    found["markers"][label] = found["markers"].get(label, 0) + 1
+                    break
         if name == "pubspec.yaml":
             found["pubspec"].append(rel)
         elif name == "Package.swift":
@@ -71,6 +98,8 @@ def _collect(root):
             found["manifest"].append(rel)
         elif ext == ".xcconfig":
             found["xcconfig"].append(rel)
+        elif name == "package.json":
+            found["package_json"].append(rel)
         if os.sep not in rel:
             found["names"].add(name)
     return found
@@ -318,6 +347,125 @@ def _flutter_facts(root, flutter_roots):
     return facts
 
 
+_KMP_TARGETS = re.compile(
+    r"\b(androidTarget|androidLibrary|iosArm64|iosSimulatorArm64|iosX64|jvm|js|wasmJs|macosArm64|macosX64|"
+    r"linuxX64|mingwX64|watchosArm64|tvosArm64)\s*[({]")
+_KMP_LIBRARIES = (
+    ("ktor", "io.ktor"), ("sqldelight", "sqldelight"), ("room", "androidx.room"), ("datastore", "androidx.datastore"),
+    ("koin", "io.insert-koin"), ("kotlin-inject", "me.tatarka.inject"), ("metro", "dev.zacsweers.metro"),
+    ("kotlinx.serialization", "serialization"), ("navigation", "androidx.navigation"),
+)
+
+
+def _kmp_facts(root, found, native_builds, gradle_blob, native_projects):
+    facts = {"modules": sorted(set(m or "." for m in found["kmp_modules"]))[:8], "targets": [], "iosFramework": [], "uses": []}
+    facts["targets"] = sorted(set(_KMP_TARGETS.findall(gradle_blob)))
+    version = _first(r"(?mi)^\s*(?:compose[-_]?multiplatform|composeMultiplatform|compose[-_]?plugin)\s*=\s*\"([\d.\w-]+)\"", gradle_blob)
+    if version or "org.jetbrains.compose" in gradle_blob:
+        facts["composeMultiplatform"] = version or True
+    integration = []
+    if "native.cocoapods" in gradle_blob:
+        integration.append("CocoaPods plugin")
+    for project in native_projects[:6]:
+        if "embedAndSignAppleFrameworkForXcode" in util.read_text(os.path.join(root, project, "project.pbxproj"), limit=_PBX_LIMIT):
+            integration.append("direct integration (Xcode build phase)")
+            break
+    if "XCFramework(" in gradle_blob or "kmmbridge" in gradle_blob.lower():
+        integration.append("XCFramework or Swift package")
+    if "co.touchlab.skie" in gradle_blob:
+        integration.append("SKIE")
+    if "swiftExport" in gradle_blob:
+        integration.append("Swift export")
+    facts["iosFramework"] = integration
+    facts["uses"] = [name for name, marker in _KMP_LIBRARIES if marker in gradle_blob]
+    return facts
+
+
+_RN_STATE = ("@reduxjs/toolkit", "redux", "zustand", "jotai", "mobx", "recoil", "@tanstack/react-query", "@apollo/client")
+_RN_NAVIGATION = ("expo-router", "@react-navigation/native", "react-native-navigation")
+_RN_STORAGE = (
+    "@react-native-async-storage/async-storage", "react-native-mmkv", "expo-sqlite", "@op-engineering/op-sqlite",
+    "@nozbe/watermelondb", "realm", "expo-secure-store", "react-native-keychain",
+)
+_RN_TESTING = ("jest", "jest-expo", "@testing-library/react-native", "detox")
+_RN_LOCKFILES = (("yarn.lock", "yarn"), ("pnpm-lock.yaml", "pnpm"), ("bun.lock", "bun"), ("bun.lockb", "bun"), ("package-lock.json", "npm"))
+
+
+def _package(root, rel):
+    data = util.read_json(os.path.join(root, rel), default=None)
+    return data if isinstance(data, dict) else {}
+
+
+def _dependencies(package):
+    deps = {}
+    for section in ("dependencies", "devDependencies"):
+        if isinstance(package.get(section), dict):
+            deps.update(package[section])
+    return deps
+
+
+def _react_native_facts(root, rn_roots):
+    main = rn_roots[0]
+    package = _package(root, os.path.join(main, "package.json"))
+    deps = _dependencies(package)
+    scripts = package.get("scripts") if isinstance(package.get("scripts"), dict) else {}
+
+    def pick(names):
+        return [n for n in names if n in deps]
+
+    def here(*parts):
+        return os.path.join(root, main, *parts)
+
+    facts = {
+        "root": main or ".", "name": package.get("name"), "packages": len(rn_roots),
+        "reactNative": str(deps.get("react-native") or ""), "react": str(deps.get("react") or ""),
+        "typescript": "typescript" in deps or os.path.isfile(here("tsconfig.json")),
+        "state": pick(_RN_STATE), "navigation": pick(_RN_NAVIGATION), "storage": pick(_RN_STORAGE), "testing": pick(_RN_TESTING),
+        "scripts": sorted(name for name in ("lint", "typecheck", "type-check", "tsc", "test") if name in scripts),
+        "eslint": "eslint" in deps,
+        "packageManager": None,
+    }
+    declared = str(package.get("packageManager") or "")
+    if declared:
+        facts["packageManager"] = declared.split("@")[0]
+    else:
+        for directory in (os.path.join(root, main), root):
+            hit = [manager for lockfile, manager in _RN_LOCKFILES if os.path.isfile(os.path.join(directory, lockfile))]
+            if hit:
+                facts["packageManager"] = hit[0]
+                break
+    if "expo" in deps:
+        facts["expo"] = str(deps["expo"])
+        native = [d for d in ("ios", "android") if os.path.isdir(here(d))]
+        ignored = [d for d in native if util.git(root, "check-ignore", "-q", os.path.join(main, d) if main else d, timeout=10)[0] == 0]
+        # Continuous Native Generation: the native folders are produced by `expo prebuild` and not kept in git.
+        facts["generatedNative"] = not native or len(ignored) == len(native)
+    properties = util.read_text(here("android", "gradle.properties"))
+    app_json = util.read_json(here("app.json"), default=None)
+    expo_config = app_json.get("expo") if isinstance(app_json, dict) and isinstance(app_json.get("expo"), dict) else {}
+    flag = _first(r"(?m)^\s*newArchEnabled\s*=\s*(true|false)\s*$", properties)
+    if flag:
+        facts["newArchitecture"] = flag == "true"
+    elif isinstance(expo_config.get("newArchEnabled"), bool):
+        facts["newArchitecture"] = expo_config["newArchEnabled"]
+    hermes = _first(r"(?m)^\s*hermesEnabled\s*=\s*(true|false)\s*$", properties)
+    if hermes:
+        facts["hermes"] = hermes == "true"
+    min_sdk = _first(r"minSdk(?:Version)?\s*[=( ]\s*(\d{2})\b", util.read_text(here("android", "build.gradle")) + util.read_text(here("android", "app", "build.gradle")))
+    if min_sdk:
+        facts["androidMinSdk"] = int(min_sdk)
+    try:
+        projects = sorted(n for n in os.listdir(here("ios")) if n.endswith(".xcodeproj"))
+    except OSError:
+        projects = []
+    if projects:
+        targets = _uniq_sorted_versions(re.findall(
+            r"IPHONEOS_DEPLOYMENT_TARGET = ([\d.]+);", util.read_text(here("ios", projects[0], "project.pbxproj"), limit=_PBX_LIMIT)))
+        if targets:
+            facts["iosDeploymentTarget"] = targets[0]
+    return facts
+
+
 def detect(root):
     """Return a dictionary of platform facts for the repository at root."""
     found = _collect(root)
@@ -326,19 +474,27 @@ def detect(root):
         text = util.read_text(os.path.join(root, rel))
         if re.search(r"(?m)^\s+sdk:\s*flutter\s*$", text) or re.search(r"(?m)^\s+flutter:\s*$", text):
             flutter_roots.append(os.path.dirname(rel))
-    native_projects = [p for p in found["xcodeproj"] if not _under(p, flutter_roots)]
-    native_packages = [p for p in found["package_swift"] if not _under(p, flutter_roots)]
-    native_podfiles = [p for p in found["podfile"] if not _under(p, flutter_roots)]
-    native_settings = [p for p in found["settings_gradle"] if not _under(p, flutter_roots)]
-    native_builds = [p for p in found["build_gradle"] if not _under(p, flutter_roots)]
-    native_manifests = [p for p in found["manifest"] if not _under(p, flutter_roots)]
+    rn_roots = []
+    for rel in sorted(found["package_json"], key=lambda p: (p.count(os.sep), p)):
+        if _under(rel, flutter_roots):
+            continue
+        if "react-native" in _dependencies(_package(root, rel)):
+            rn_roots.append(os.path.dirname(rel))
+    # The ios/ and android/ folders of a Flutter or React Native app belong to that app.
+    embedding = flutter_roots + rn_roots
+    native_projects = [p for p in found["xcodeproj"] if not _under(p, embedding)]
+    native_packages = [p for p in found["package_swift"] if not _under(p, embedding)]
+    native_podfiles = [p for p in found["podfile"] if not _under(p, embedding)]
+    native_settings = [p for p in found["settings_gradle"] if not _under(p, embedding)]
+    native_builds = [p for p in found["build_gradle"] if not _under(p, embedding)]
+    native_manifests = [p for p in found["manifest"] if not _under(p, embedding)]
 
-    result = {"root": root, "platforms": [], "notes": []}
+    result = {"root": root, "platforms": [], "notes": [], "architecture": found["markers"]}
     if native_projects or native_packages or native_podfiles:
         result["platforms"].append("ios")
-        native_xcconfigs = [p for p in found["xcconfig"] if not _under(p, flutter_roots)]
+        native_xcconfigs = [p for p in found["xcconfig"] if not _under(p, embedding)]
         result["ios"] = _ios_facts(root, found, native_projects, native_packages, native_podfiles, native_xcconfigs)
-    is_android = False
+    is_android, blob = False, ""
     if native_settings or native_builds:
         blob = "".join(util.read_text(os.path.join(root, p), limit=200_000) for p in (native_builds + native_settings)[:40])
         blob += util.read_text(os.path.join(root, os.path.dirname(native_settings[0]) if native_settings else "", "gradle", "libs.versions.toml"))
@@ -346,11 +502,16 @@ def detect(root):
     if is_android:
         result["platforms"].append("android")
         result["android"] = _android_facts(root, found, native_settings, native_builds)
-        if "kmp" in result["android"]["flags"]:
-            result["notes"].append("Kotlin Multiplatform detected: shared code has constraints the Android skill does not cover.")
+    if "kotlin.multiplatform" in blob or 'kotlin("multiplatform")' in blob:
+        result["platforms"].append("kotlin-multiplatform")
+        result["kotlin-multiplatform"] = _kmp_facts(
+            root, found, native_builds, blob, [p for p in found["xcodeproj"] if not _under(p, embedding)])
     if flutter_roots:
         result["platforms"].append("flutter")
         result["flutter"] = _flutter_facts(root, flutter_roots)
+    if rn_roots:
+        result["platforms"].append("react-native")
+        result["react-native"] = _react_native_facts(root, rn_roots)
     return result
 
 
@@ -440,6 +601,55 @@ def profile_lines(facts):
         if flutter.get("packages", 1) > 1:
             parts.append("%d Dart packages" % flutter["packages"])
         lines.append("- Flutter: " + "; ".join(parts))
+    kmp = facts.get("kotlin-multiplatform")
+    if kmp:
+        parts = []
+        if kmp["modules"]:
+            parts.append("shared modules: %s" % _join(kmp["modules"][:5]))
+        if kmp["targets"]:
+            parts.append("targets: %s" % _join(kmp["targets"]))
+        if kmp.get("composeMultiplatform"):
+            parts.append("Compose Multiplatform%s" % ("" if kmp["composeMultiplatform"] is True else " " + kmp["composeMultiplatform"]))
+        if kmp["iosFramework"]:
+            parts.append("iOS framework via %s" % _join(kmp["iosFramework"]))
+        if kmp["uses"]:
+            parts.append("uses %s" % _join(kmp["uses"]))
+        lines.append("- Kotlin Multiplatform: " + ("; ".join(parts) or "plugin applied"))
+    rn = facts.get("react-native")
+    if rn:
+        parts = ["react-native %s" % (rn["reactNative"] or "version not found")]
+        if rn.get("expo"):
+            parts.append("Expo SDK %s%s" % (rn["expo"], " (ios/ and android/ are generated by prebuild: never hand-edit them)" if rn.get("generatedNative") else ""))
+        minor = re.match(r"\D*0\.(\d+)", rn["reactNative"])
+        if minor and int(minor.group(1)) >= 82:
+            parts.append("New Architecture (the only one since 0.82)")
+        elif "newArchitecture" in rn:
+            parts.append("New Architecture %s" % ("on" if rn["newArchitecture"] else "off"))
+        parts.append("TypeScript" if rn["typescript"] else "JavaScript only")
+        if rn.get("packageManager"):
+            parts.append("package manager %s" % rn["packageManager"])
+        if rn["state"]:
+            parts.append("state: %s" % _join(rn["state"]))
+        if rn["navigation"]:
+            parts.append("navigation: %s" % _join(rn["navigation"]))
+        if rn["storage"]:
+            parts.append("storage: %s" % _join(rn["storage"]))
+        if rn.get("iosDeploymentTarget"):
+            parts.append("embedded iOS minimum %s" % rn["iosDeploymentTarget"])
+        if rn.get("androidMinSdk"):
+            parts.append("embedded Android minSdk %s" % rn["androidMinSdk"])
+        if rn.get("packages", 1) > 1:
+            parts.append("%d React Native packages" % rn["packages"])
+        lines.append("- React Native: " + "; ".join(parts))
+    markers = facts.get("architecture") or {}
+    if markers and facts.get("platforms"):
+        counted = ", ".join("%d %s" % (count, label if count != 1 else _SINGULAR.get(label, label))
+                            for label, count in sorted(markers.items(), key=lambda kv: -kv[1])[:6])
+        line = "- Architecture, from file names: %s. New code follows the pattern of the feature it is in." % counted
+        owner = "coordinator" if markers.get("coordinators") else "router" if markers.get("routers") else None
+        if owner:
+            line += " Navigation belongs to the %s: a screen reports what happened and the %s creates and shows the next screen; screens do not create or push each other." % (owner, owner)
+        lines.append(line)
     for note in facts.get("notes", []):
         lines.append("- Note: " + note)
     return lines

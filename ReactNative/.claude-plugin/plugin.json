@@ -1,0 +1,17 @@
+{
+  "name": "mobile-react-native",
+  "version": "0.3.0",
+  "description": "React Native expertise pack for the mobile-coding-agents toolkit: Expo and bare projects, the New Architecture, native modules, navigation and state, storage, testing, performance, release and over-the-air updates",
+  "author": {
+    "name": "Mohsen"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "typescript",
+    "javascript"
+  ],
+  "dependencies": [
+    "mobile-core"
+  ]
+}

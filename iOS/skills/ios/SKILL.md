@@ -1,6 +1,6 @@
 ---
 name: ios
-description: iOS engineering reference for Swift, SwiftUI, UIKit and Objective-C codebases, including legacy ones. Covers xcodebuild, signing and package-manager failures, UIKit lifecycle and memory, Objective-C interop, adding SwiftUI to UIKit apps, Swift concurrency and Swift 6 migration, Core Data and SwiftData migrations, XCTest and Swift Testing, Instruments-based performance work, privacy manifests, accessibility and App Store requirements. Use when writing, reviewing, debugging, migrating or building iOS code, or when an Xcode build, test or archive fails.
+description: iOS engineering reference for Swift, SwiftUI, UIKit and Objective-C codebases, including legacy ones. Covers xcodebuild, signing and package-manager failures, UIKit lifecycle and memory, Objective-C interop, adding SwiftUI to UIKit apps, Swift concurrency and Swift 6 migration, Core Data and SwiftData migrations, architecture patterns (MVVM, coordinators, VIPER, TCA), dependency injection and modules, XCTest and Swift Testing, Instruments-based performance work, privacy manifests, accessibility and App Store requirements. Use when writing, reviewing, debugging, migrating or building iOS code, or when an Xcode build, test or archive fails.
 ---
 
 # iOS engineering
@@ -20,6 +20,8 @@ Read the project facts first: the session-start profile, or `mobile detect`. Min
 |---|---|
 | Build, test, archive, signing, SwiftPM or CocoaPods failures, project-file edits, simulator control | [references/build.md](references/build.md) |
 | UIKit lifecycle and memory, Objective-C interop, SwiftUI inside UIKit, scene lifecycle, CocoaPods to SwiftPM, `ObservableObject` to `@Observable` | [references/legacy.md](references/legacy.md) |
+| Working inside MVVM, coordinators, VIPER, TCA or layered code; `@Observable` ownership; SwiftUI navigation and routers; choosing a pattern for new code | [references/architecture.md](references/architecture.md) |
+| Dependency injection (initialisers, environment, Factory, swift-dependencies, Swinject), Swift packages as modules, generated projects, build time | [references/modules.md](references/modules.md) |
 | async/await, actors, `Sendable`, main-actor isolation, Swift 6 language mode, GCD and Combine interop | [references/concurrency.md](references/concurrency.md) |
 | Core Data, SwiftData, `UserDefaults`, Keychain, files, schema migration | [references/persistence.md](references/persistence.md) |
 | XCTest, Swift Testing, UI tests, snapshot tests, flaky tests | [references/testing.md](references/testing.md) |

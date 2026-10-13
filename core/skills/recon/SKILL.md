@@ -1,6 +1,6 @@
 ---
 name: recon
-description: Maps an unfamiliar or legacy iOS, Android or Flutter codebase before it is changed. Covers modules, entry points, navigation, data flow, persistence, tests and risk hotspots, and writes a cited code map. Use when starting work in a repository or area not yet read in this session, when asked how an app is structured, or before planning a refactor or migration.
+description: Maps an unfamiliar or legacy mobile codebase before it is changed. Covers modules, entry points, navigation, data flow, persistence, tests and risk hotspots, and writes a cited code map. Use when starting work in a repository or area not yet read in this session, when asked how an app is structured, or before planning a refactor or migration.
 argument-hint: "[area or module to map; empty for the whole repository]"
 allowed-tools: Bash(mobile recon *) Bash(mobile detect *)
 ---
@@ -34,7 +34,7 @@ Write or update the code map (`docs/agent/CODEMAP.md` unless `.mobile-coding-age
 - **Shape.** Platforms, modules or targets, and what each owns. One line each.
 - **How it runs.** Entry point, composition root, navigation, each with `file:line`.
 - **Data.** Network layer, stores, where models are mapped, current schema versions.
-- **Conventions in use.** Architecture pattern per area and its exceptions, state management, concurrency style, dependency injection. One representative file per convention.
+- **Conventions in use.** Architecture pattern per area and its exceptions, state management, concurrency style, dependency injection. One representative file per convention. `mobile recon` counts the markers (view models, coordinators, presenters, reducers, use cases, repositories, dependency-injection imports): name the pattern from those counts and a file you read, not from folder names.
 - **Tests.** Which kinds exist, how to run them, what is not covered.
 - **Risk register.** Hotspots from `mobile recon`, untested critical paths, legacy islands and whether they are intentional, anything surprising.
 - **Open questions** for the team.

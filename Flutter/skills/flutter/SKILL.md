@@ -1,6 +1,6 @@
 ---
 name: flutter
-description: Flutter and Dart engineering reference, including legacy apps. Covers toolchain and pub failures, native iOS and Android build failures inside a Flutter project, flavors and code generation, migrations of state management (setState, Provider, GetX, BLoC, Riverpod), navigation, null safety and deprecated APIs, platform channels and Pigeon, async and isolates, drift, sqflite and Hive migrations, widget, golden and integration tests, jank, startup and app-size work, security, accessibility and store requirements. Use when writing, reviewing, debugging, migrating or building Flutter or Dart code, or when flutter analyze, test or build fails.
+description: Flutter and Dart engineering reference, including legacy apps. Covers toolchain and pub failures, native iOS and Android build failures inside a Flutter project, flavors and code generation, migrations of state management (setState, Provider, GetX, BLoC, Riverpod), navigation, null safety and deprecated APIs, architecture patterns (BLoC, Riverpod, MVVM, layering), dependency injection and pub workspaces, platform channels and Pigeon, async and isolates, drift, sqflite and Hive migrations, widget, golden and integration tests, jank, startup and app-size work, security, accessibility and store requirements. Use when writing, reviewing, debugging, migrating or building Flutter or Dart code, or when flutter analyze, test or build fails.
 ---
 
 # Flutter engineering
@@ -20,6 +20,8 @@ Read the project facts first: the session-start profile, or `mobile detect`. Dar
 |---|---|
 | Toolchain, pub resolution, code generation, flavors, iOS and Android build failures, the Dart MCP server | [references/build.md](references/build.md) |
 | Migrating state management, navigation, null safety, deprecated APIs, platform channels | [references/legacy.md](references/legacy.md) |
+| Working inside BLoC, Riverpod or MVVM; layering; go_router structure; choosing a pattern for new code | [references/architecture.md](references/architecture.md) |
+| Dependency injection (`provider`, `get_it`, Riverpod), splitting into packages, pub workspaces, melos | [references/modules.md](references/modules.md) |
 | `async` and `await`, `mounted`, disposal, streams, isolates, app lifecycle | [references/concurrency.md](references/concurrency.md) |
 | drift, sqflite, Hive, shared_preferences, secure storage, files, JSON models | [references/persistence.md](references/persistence.md) |
 | Unit, widget, golden and integration tests, Patrol, flaky tests | [references/testing.md](references/testing.md) |

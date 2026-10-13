@@ -25,7 +25,7 @@ def main(argv=None):
 
     p = sub.add_parser("verify", help="run the project's checks; print only failures with file and line")
     p.add_argument("--level", choices=("quick", "test", "full"), default="quick")
-    p.add_argument("--platform", action="append", choices=("ios", "android", "flutter"))
+    p.add_argument("--platform", action="append", choices=("ios", "android", "flutter", "react-native", "kotlin-multiplatform"))
     p.add_argument("--dry-run", action="store_true", help="show the commands without running them")
     p.add_argument("--root")
 
@@ -44,7 +44,7 @@ def main(argv=None):
 
     p = sub.add_parser("adopt", help="write the project overlay into an application repository (never overwrites)")
     p.add_argument("--target", default=".")
-    p.add_argument("--platforms", help="comma-separated: ios,android,flutter (default: detected)")
+    p.add_argument("--platforms", help="comma-separated: ios,android,flutter,react-native,kotlin-multiplatform (default: detected)")
     p.add_argument("--marketplace", help="git URL, owner/repo, or local path of the toolkit (default: this checkout)")
     p.add_argument("--merge-settings", action="store_true", help="add entries to an existing .claude/settings.json")
     p.add_argument("--dry-run", action="store_true")

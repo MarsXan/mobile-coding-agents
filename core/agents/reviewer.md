@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Independent reviewer for mobile changes. Reviews a diff in a fresh context that has not seen the author's reasoning and returns verified, severity-ranked findings. Use after a non-trivial iOS, Android or Flutter change is implemented and before it is committed or merged, or when a second opinion on a change is requested.
+description: Independent reviewer for mobile changes. Reviews a diff in a fresh context that has not seen the author's reasoning and returns verified, severity-ranked findings. Use after a non-trivial mobile change is implemented and before it is committed or merged, or when a second opinion on a change is requested.
 tools: Read, Grep, Glob, Bash
 color: orange
 skills:

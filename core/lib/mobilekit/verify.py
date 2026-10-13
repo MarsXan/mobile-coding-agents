@@ -20,26 +20,25 @@ from . import detect, util
 LEVELS = ("quick", "test", "full")
 TIMEOUTS = {"quick": 900, "test": 2400, "full": 3600}
 
-_SOURCE_PATHSPECS = ["*" + ext for ext in config_module.SOURCE_EXTENSIONS] + list(config_module.SOURCE_NAMES) + [
-    "*/" + name for name in config_module.SOURCE_NAMES]
-
 
 # --------------------------------------------------------------------------
 # Source fingerprint
 # --------------------------------------------------------------------------
 
-def source_fingerprint(root):
+def source_fingerprint(root, platforms=()):
     """A hash of every source file's content as it is on disk right now.
 
     It does not change when work is staged or committed, or when a non-source
     file changes; it does change when a source file is edited by any route
     (the Edit tool, sed, a code generator). Nothing is written to the
-    repository to compute it.
+    repository to compute it. `platforms` are the detected ones: they decide
+    which file types count as source.
     """
+    pathspecs = config_module.source_pathspecs(platforms)
     if util.git_dir(root):
-        code, listing = util.run(["git", "-C", root, "ls-files", "-s", "-z", "--"] + _SOURCE_PATHSPECS, timeout=60)
+        code, listing = util.run(["git", "-C", root, "ls-files", "-s", "-z", "--"] + pathspecs, timeout=60)
         code2, dirty = util.run(
-            ["git", "-C", root, "ls-files", "-m", "-o", "-d", "-z", "--exclude-standard", "--"] + _SOURCE_PATHSPECS, timeout=60)
+            ["git", "-C", root, "ls-files", "-m", "-o", "-d", "-z", "--exclude-standard", "--"] + pathspecs, timeout=60)
         if code == 0 and code2 == 0:
             blobs = {}
             for record in listing.split("\0"):
@@ -72,7 +71,7 @@ def source_fingerprint(root):
             return "git:" + util.sha1("\n".join("%s %s" % item for item in sorted(blobs.items())))
     digest = hashlib.sha1()
     for rel, is_dir in util.walk(root, max_depth=12):
-        if is_dir or not config_module.is_source(rel.replace(os.sep, "/")):
+        if is_dir or not config_module.is_source(rel.replace(os.sep, "/"), platforms):
             continue
         try:
             stat = os.stat(os.path.join(root, rel))
@@ -86,9 +85,11 @@ def read_stamp(root):
     return util.read_json(os.path.join(util.state_dir(root), "verified.json"), default={}) or {}
 
 
-def write_stamp(root, level, platforms):
+def write_stamp(root, level, platforms, detected=None):
+    """Record that the current source state passed. `detected` is every platform
+    in the repository (it sets which files count); `platforms` is what was run."""
     util.write_json(os.path.join(util.state_dir(root), "verified.json"), {
-        "fingerprint": source_fingerprint(root), "level": level,
+        "fingerprint": source_fingerprint(root, detected if detected is not None else platforms), "level": level,
         "platforms": platforms, "time": int(time.time()),
     })
 
@@ -239,6 +240,29 @@ def _android_steps(root, facts, level, changed):
     return [Step("gradle-" + level, base + tasks, cwd=cwd)]
 
 
+def _gradle_wrapper(root):
+    for rel, is_dir in util.walk(root, max_depth=3):
+        if not is_dir and os.path.basename(rel) == "gradlew":
+            return rel
+    return None
+
+
+def _kotlin_multiplatform_steps(root, facts, level, changed):
+    """Shared code: compile it for one Apple target (the Android plan covers the Android side), then run every target's tests.
+
+    Compiling one target is the cheap check. `build` and `assemble` link every framework and are far slower.
+    """
+    targets = facts["kotlin-multiplatform"].get("targets", [])
+    wrapper = _gradle_wrapper(root)
+    if not wrapper:
+        raise NeedsConfig("Kotlin Multiplatform: no gradlew wrapper found. Set verify.kotlin-multiplatform.%s in %s." % (level, config_module.CONFIG_NAME))
+    compile_task = next((task for target, task in (
+        ("iosSimulatorArm64", "compileKotlinIosSimulatorArm64"), ("iosArm64", "compileKotlinIosArm64"), ("iosX64", "compileKotlinIosX64"),
+    ) if target in targets), "compileKotlinMetadata")
+    tasks = {"quick": [compile_task], "test": ["allTests"], "full": [compile_task, "allTests"]}[level]
+    return [Step("gradle-shared-" + level, ["./gradlew", "--console=plain", "-q"] + tasks, cwd=os.path.dirname(wrapper) or None)]
+
+
 def _flutter_steps(root, facts, level, changed):
     flutter = facts["flutter"]
     tool = ["fvm", "flutter"] if flutter.get("pinnedFlutter") and util.which("fvm") else ["flutter"]
@@ -251,7 +275,50 @@ def _flutter_steps(root, facts, level, changed):
     return steps
 
 
-_DEFAULTS = {"ios": _ios_steps, "android": _android_steps, "flutter": _flutter_steps}
+_JS_FILE = re.compile(r"\.(?:ts|tsx|js|jsx)$")
+
+
+def _react_native_steps(root, facts, level, changed):
+    rn = facts["react-native"]
+    base = "" if rn.get("root") in (None, ".", "") else rn["root"]
+    cwd = base or None
+    manager = rn.get("packageManager") or "npm"
+    run = {"yarn": ["yarn", "run"], "pnpm": ["pnpm", "run"], "bun": ["bun", "run"]}.get(manager, ["npm", "run", "--silent"])
+    # Run the project's own binary; never let a runner download one with the same name.
+    local = {"yarn": ["yarn"], "pnpm": ["pnpm", "exec"], "bun": ["bunx", "--no-install"]}.get(manager, ["npx", "--no-install"])
+    scripts = rn.get("scripts", [])
+    steps = []
+    if level in ("quick", "full"):
+        typecheck = next((name for name in ("typecheck", "type-check", "tsc") if name in scripts), None)
+        if typecheck:
+            steps.append(Step("typecheck", run + [typecheck], cwd=cwd))
+        elif rn.get("typescript"):
+            steps.append(Step("typecheck", local + ["tsc", "--noEmit", "--pretty", "false"], cwd=cwd))
+        if level == "full" and "lint" in scripts:
+            steps.append(Step("lint", run + ["lint"], cwd=cwd))
+        elif rn.get("eslint"):
+            prefix = base + "/" if base else ""
+            files = [f[len(prefix):] for f in changed if _JS_FILE.search(f) and f.startswith(prefix) and "node_modules/" not in f]
+            if level == "full":
+                steps.append(Step("eslint", local + ["eslint", "."], cwd=cwd))
+            elif files:
+                steps.append(Step("eslint", local + ["eslint"] + files[:300], cwd=cwd))
+    if level in ("test", "full"):
+        if any(name in rn.get("testing", []) for name in ("jest", "jest-expo")):
+            steps.append(Step("jest", local + ["jest", "--ci"], cwd=cwd))
+        elif "test" in scripts:
+            steps.append(Step("test", run + ["test"], cwd=cwd))
+    if not steps:
+        raise NeedsConfig(
+            "React Native: no type check, lint or test setup found for the %s level. Set verify.react-native.%s in %s, "
+            "for example \"npx tsc --noEmit\"." % (level, level, config_module.CONFIG_NAME))
+    return steps
+
+
+_DEFAULTS = {
+    "ios": _ios_steps, "android": _android_steps, "flutter": _flutter_steps,
+    "react-native": _react_native_steps, "kotlin-multiplatform": _kotlin_multiplatform_steps,
+}
 
 
 def plan(root, config, facts, level, platforms=None):
@@ -294,7 +361,12 @@ _DIAGNOSTICS = [
     re.compile(r"^(?P<msg>Undefined symbols? for architecture .+)$"),
     re.compile(r"^(?P<msg>\*\* (?:BUILD|TEST|ARCHIVE) FAILED \*\*)$"),
     re.compile(r"^(?P<msg>FAILURE: .+|BUILD FAILED.*)$"),
+    re.compile(r"^(?P<loc>[^\s(]+\(\d+,\d+\)): (?P<kind>error) (?P<code>TS\d+): (?P<msg>.+)$"),      # tsc
+    re.compile(r"^\s*● (?!Console\b)(?P<msg>.+ › .+)$"),                                              # a failed Jest test
+    re.compile(r"^(?P<msg>FAIL\s+\S+\.(?:ts|tsx|js|jsx).*)$"),                                         # a failed Jest file
 ]
+_ESLINT_FILE = re.compile(r"^(?P<file>/.*\.(?:ts|tsx|js|jsx|mjs|cjs))$")      # ESLint prints the absolute path
+_ESLINT_FINDING = re.compile(r"^\s+(?P<line>\d+):(?P<col>\d+)\s+error\s+(?P<msg>.+?)\s{2,}(?P<rule>\S+)\s*$")
 _WARNING = re.compile(r"^(?P<loc>(?:/|[A-Za-z0-9_.~@+-]).*?:\d+(?::\d+)?): warning: (?P<msg>.+)$")
 
 
@@ -306,10 +378,19 @@ def extract_diagnostics(output, root, limit=25, include_warnings=False):
     """Pull the lines that explain a failure out of a build or test log."""
     found, seen = [], set()
     lines = output.splitlines()
+    eslint_file = None
     for index, line in enumerate(lines):
         line = line.rstrip()
         entry = None
-        for pattern in _DIAGNOSTICS:
+        # ESLint's default report names the file on one line and lists its findings below it.
+        file_match = _ESLINT_FILE.match(line)
+        if file_match:
+            eslint_file = file_match.group("file")
+            continue
+        finding = _ESLINT_FINDING.match(line) if eslint_file else None
+        if finding:
+            entry = "%s:%s:%s: %s (%s)" % (eslint_file, finding.group("line"), finding.group("col"), finding.group("msg"), finding.group("rule"))
+        for pattern in ([] if entry else _DIAGNOSTICS):
             match = pattern.match(line)
             if match:
                 groups = match.groupdict()
@@ -407,6 +488,6 @@ def main(root, level="quick", platforms=None, dry_run=False, out=print):
     if problems:
         out("RESULT: INCOMPLETE (%d checks passed, %d could not be planned). Not recorded as verified." % (len(steps), len(problems)))
         return 2
-    write_stamp(root, level, platforms or config["platforms"] or facts["platforms"])
+    write_stamp(root, level, platforms or config["platforms"] or facts["platforms"], detected=facts["platforms"])
     out("RESULT: PASS (%d checks) · recorded for the current source state" % len(steps))
     return 0

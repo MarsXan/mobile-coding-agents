@@ -1,6 +1,6 @@
 ---
 name: android
-description: Android engineering reference for Kotlin, Jetpack Compose, Views and Java codebases, including legacy ones. Covers Gradle, AGP and R8 failures, lifecycle, process death and saved state, coroutines and Flow, migrations from RxJava, LiveData, Views, kapt and Dagger with Compose interop, Room and DataStore migrations, unit, UI and screenshot tests, startup, jank, ANR and memory work, security, accessibility and Google Play requirements. Use when writing, reviewing, debugging, migrating or building Android code, or when a Gradle build or an Android test fails.
+description: Android engineering reference for Kotlin, Jetpack Compose, Views and Java codebases, including legacy ones. Covers Gradle, AGP and R8 failures, lifecycle, process death and saved state, coroutines and Flow, migrations from RxJava, LiveData, Views, kapt and Dagger with Compose interop, Room and DataStore migrations, architecture patterns (state holders, MVI, layered code), Navigation 3, dependency injection and modules, unit, UI and screenshot tests, startup, jank, ANR and memory work, security, accessibility and Google Play requirements. Use when writing, reviewing, debugging, migrating or building Android code, or when a Gradle build or an Android test fails.
 ---
 
 # Android engineering
@@ -20,6 +20,8 @@ Read the project facts first: the session-start profile, or `mobile detect`. min
 |---|---|
 | Gradle, AGP, Kotlin and R8 failures, dependency conflicts, upgrades, version catalogs | [references/build.md](references/build.md) |
 | Views, Fragments and Java code; migrating RxJava, LiveData, kapt, Dagger, Views to their successors; Compose interop; edge-to-edge and back handling | [references/legacy.md](references/legacy.md) |
+| Working inside MVVM, MVI or layered code; UI state and events; Navigation 3 and Navigation Compose structure; choosing a pattern for new code | [references/architecture.md](references/architecture.md) |
+| Hilt, Koin and Metro; module boundaries; convention plugins; what AGP 9 changes in a multi-module build | [references/modules.md](references/modules.md) |
 | Coroutines, Flow, lifecycle-aware collection, threading, background work, process death | [references/concurrency.md](references/concurrency.md) |
 | Room, DataStore, SharedPreferences, files, backup, schema migration | [references/persistence.md](references/persistence.md) |
 | Unit, Compose and Espresso tests, screenshot tests, flaky tests | [references/testing.md](references/testing.md) |

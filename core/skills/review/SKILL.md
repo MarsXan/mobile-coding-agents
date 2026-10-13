@@ -1,6 +1,6 @@
 ---
 name: review
-description: Reviews a mobile code change for defects that reach users. Checks correctness, lifecycle and state loss, concurrency, data-migration safety, backward compatibility, security and privacy, accessibility, performance and test integrity, and reports verified, severity-ranked findings. Use when asked to review a diff, branch, commit or pull request in an iOS, Android or Flutter project, or to check a change before it is merged.
+description: Reviews a mobile code change for defects that reach users. Checks correctness, lifecycle and state loss, concurrency, data-migration safety, backward compatibility, security and privacy, accessibility, performance and test integrity, and reports verified, severity-ranked findings. Use when asked to review a diff, branch, commit or pull request in a mobile project, or to check a change before it is merged.
 argument-hint: "[base branch or commit; default is the merge base with the base branch]"
 allowed-tools: Bash(mobile risk *) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(git merge-base *) Bash(git status *)
 ---

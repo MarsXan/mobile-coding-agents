@@ -1,6 +1,6 @@
 ---
 name: design
-description: Designs a mobile feature, subsystem or architecture change before code is written, as a short decision document with options, trade-offs, rollout and build order. Covers offline and sync, state and navigation architecture, modularisation, API contracts and versioning, persistence, background work, push, deep links and feature flags. Use when asked to design, architect or evaluate an approach for an iOS, Android or Flutter app, or when a requested change is too large or too uncertain to start coding.
+description: Designs a mobile feature, subsystem or architecture change before code is written, as a short decision document with options, trade-offs, rollout and build order. Covers offline and sync, state and navigation architecture, modularisation, API contracts and versioning, persistence, background work, push, deep links and feature flags. Use when asked to design, architect or evaluate an approach for a mobile app, or when a requested change is too large or too uncertain to start coding.
 argument-hint: "<what to design>"
 ---
 
@@ -13,6 +13,7 @@ Produce a decision document, not a description of an answer already chosen. A re
 - The problem in the user's terms, the constraint that makes it hard, and what is out of scope.
 - The forces that are specific to mobile and usually decide the design. Go through [references/mobile-forces.md](references/mobile-forces.md) and keep only the ones that apply.
 - The existing architecture, from the code map and the code. Fit the design to it unless changing it is the point, and say which.
+- For a new project or module, or when the question is which pattern to use, read `architecture.md` and `modules.md` in the platform skill for that stack before writing options. They hold the pattern rules, the current state of the libraries and a default for new code.
 
 ## 2. Options
 

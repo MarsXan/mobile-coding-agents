@@ -16,7 +16,10 @@ _CODE = {
     ".swift": "Swift", ".m": "Objective-C", ".mm": "Objective-C++", ".h": "C/ObjC header",
     ".kt": "Kotlin", ".java": "Java", ".dart": "Dart", ".kts": "Gradle Kotlin DSL",
     ".gradle": "Gradle Groovy", ".xml": "XML", ".storyboard": "Storyboard", ".xib": "XIB",
+    ".ts": "TypeScript", ".tsx": "TypeScript (TSX)", ".js": "JavaScript", ".jsx": "JavaScript (JSX)",
 }
+# Counted only in a React Native project: elsewhere JavaScript is tooling or a web folder.
+_JS_EXTENSIONS = (".ts", ".tsx", ".js", ".jsx")
 _TEST_PATH = util.TEST_PATH
 _GENERATED_NAME = re.compile(r"\.(g|freezed|gr|mocks|pb|pbenum|pbjson|config)\.dart$|\.generated\.swift$|\.pb\.swift$")
 
@@ -41,6 +44,14 @@ _PATTERNS = {
         ("XCTest cases", r":\s*XCTestCase\b"),
         ("Swift Testing (@Test)", r"@Test\b"),
         ("lint suppressions", r"swiftlint:disable"),
+        ("view models", r"\b(?:class|struct|actor)\s+\w+ViewModel\b"),
+        ("coordinators", r"\b(?:class|struct|protocol)\s+\w*Coordinator\b"),
+        ("VIPER parts (presenter, interactor, wireframe)", r"\b(?:class|struct|protocol)\s+\w+(?:Presenter|Interactor|Wireframe)\b"),
+        ("TCA reducers", r"@Reducer\b|:\s*Reducer(?:Protocol)?\b"),
+        ("use cases", r"\b(?:class|struct|protocol)\s+\w+UseCase\b"),
+        ("repositories", r"\b(?:class|struct|protocol|actor)\s+\w+Repository\b"),
+        ("dependency-injection library imports", r"^import (?:Swinject|Factory|FactoryKit|Needle|Resolver|Dependencies|Dip)\b"),
+        ("NavigationStack", r"\bNavigationStack\b"),
     ],
     ".m": [
         ("Objective-C implementations", r"^@implementation\b"),
@@ -62,6 +73,15 @@ _PATTERNS = {
         ("SharedPreferences", r"\bSharedPreferences\b"),
         ("startActivityForResult / onBackPressed (deprecated)", r"\bstartActivityForResult\b|override\s+fun\s+onBackPressed\b"),
         ("warning suppressions", r"@Suppress(?:Lint)?\("),
+        ("use cases", r"\bclass\s+\w+UseCase\b"),
+        ("repositories", r"\b(?:class|interface)\s+\w+Repository\b"),
+        ("presenters (MVP)", r"\bclass\s+\w+Presenter\b"),
+        ("MVI intent, action or event types", r"\bsealed\s+(?:class|interface)\s+\w*(?:Intent|Action|UiEvent|ViewEvent)\b"),
+        ("Hilt annotations", r"@(?:HiltViewModel|AndroidEntryPoint|HiltAndroidApp|InstallIn)\b"),
+        ("Koin (module, inject, koinViewModel)", r"\bmodule\s*\{|\bby\s+inject\s*[<(]|\bkoinViewModel\s*[<(]|\bkoinInject\s*[<(]"),
+        ("navigation hosts (NavHost, NavDisplay)", r"\bNavHost\s*\(|\bNavDisplay\s*\("),
+        ("expect declarations (multiplatform)", r"^\s*(?:(?:public|internal)\s+)?expect\s+(?:fun|class|val|var|object|interface|annotation|enum|value)\b"),
+        ("actual declarations (multiplatform)", r"^\s*(?:(?:public|internal|private)\s+)?actual\s+(?:fun|class|val|var|object|interface|typealias|annotation|enum|value|constructor)\b"),
     ],
     ".java": [
         ("Java classes", r"\b(?:class|interface|enum)\s+\w+"),
@@ -83,11 +103,33 @@ _PATTERNS = {
         ("dynamic", r"\bdynamic\b"),
         ("analyzer suppressions", r"//\s*ignore(?:_for_file)?:"),
         ("print calls", r"^\s*print\("),
+        ("view models", r"\bclass\s+\w+ViewModel\b"),
+        ("use cases", r"\bclass\s+\w+UseCase\b"),
+        ("repositories", r"\bclass\s+\w+Repository\b"),
+        ("get_it lookups", r"\bGetIt\.(?:I|instance)\b|\bgetIt\s*[<(]|\bsl\s*[<(]"),
+        ("go_router routes", r"\bGoRoute\s*\("),
     ],
 }
-_TEST_LABELS = frozenset({"XCTest cases", "Swift Testing (@Test)"})
+_JS_PATTERNS = [
+    ("class components", r"\bclass\s+\w+\s+extends\s+(?:React\.)?(?:Pure)?Component\b"),
+    ("useEffect calls", r"\buseEffect\s*\("),
+    ("Redux (useSelector, connect, createSlice)", r"\buseSelector\s*\(|\bconnect\s*\(\s*map|\bcreateSlice\s*\("),
+    ("React Navigation navigators", r"\bcreate(?:Native)?(?:Stack|BottomTab|Drawer|MaterialTopTab)Navigator\s*\("),
+    ("AsyncStorage calls", r"\bAsyncStorage\.\w+\("),
+    ("old native-module access (NativeModules, UIManager, findNodeHandle, setNativeProps)",
+     r"\bNativeModules\.|\bUIManager\.|\bfindNodeHandle\s*\(|\.setNativeProps\s*\("),
+    ("FlatList / SectionList / FlashList", r"<(?:FlatList|SectionList|FlashList)\b"),
+    ("any types", r":\s*any\b|\bas\s+any\b"),
+    ("type and lint suppressions", r"@ts-ignore|@ts-expect-error|@ts-nocheck|eslint-disable"),
+    ("console.log calls", r"\bconsole\.log\s*\("),
+    ("Jest test cases", r"^\s*(?:it|test)(?:\.each\([^)]*\))?\s*\("),
+]
+for _ext in _JS_EXTENSIONS:
+    _PATTERNS[_ext] = _JS_PATTERNS
+_TEST_LABELS = frozenset({"XCTest cases", "Swift Testing (@Test)", "Jest test cases"})
 _COMPILED = {ext: [(label, re.compile(rx, re.M)) for label, rx in items] for ext, items in _PATTERNS.items()}
 _COMPILED[".mm"] = _COMPILED[".m"]
+_SOURCE_SET = re.compile(r"(?:^|/)src/([A-Za-z0-9]+(?:Main|Test))/")
 
 
 def _churn(root, months=12):
@@ -109,6 +151,8 @@ def inventory(root, max_files=20000):
     largest = []
     persistence = {"coreDataModels": 0, "roomSchemas": 0, "driftSchemas": 0}
     other = {"storyboards": 0, "xibs": 0, "androidLayouts": 0, "snapshotDirs": 0}
+    uses_js = "react-native" in facts["platforms"]
+    source_sets = {}
     scanned = 0
     for rel, is_dir in util.walk(root, max_depth=14):
         posix = rel.replace(os.sep, "/")
@@ -132,6 +176,12 @@ def inventory(root, max_files=20000):
             persistence["driftSchemas"] += 1
         if ext not in _COMPILED and ext not in (".kts", ".gradle", ".h"):
             continue
+        if ext in _JS_EXTENSIONS and not uses_js:
+            continue
+        if ext == ".kt" and "kotlin-multiplatform" in facts["platforms"]:
+            match = _SOURCE_SET.search(posix)
+            if match:
+                source_sets[match.group(1)] = source_sets.get(match.group(1), 0) + 1
         if _GENERATED_NAME.search(name):
             generated += 1
             continue
@@ -147,7 +197,7 @@ def inventory(root, max_files=20000):
         if is_test:
             tests["files"] += 1
             tests["lines"] += lines
-        if ext in (".swift", ".kt", ".java", ".dart", ".m", ".mm") and not is_test:
+        if ext in (".swift", ".kt", ".java", ".dart", ".m", ".mm") + _JS_EXTENSIONS and not is_test:
             largest.append((lines, posix))
         for label, regex in _COMPILED.get(ext, []):
             if is_test != (label in _TEST_LABELS):
@@ -171,13 +221,14 @@ def inventory(root, max_files=20000):
         "facts": facts, "languages": languages, "tests": tests, "generatedFilesSkipped": generated,
         "patterns": patterns, "largest": largest[:10], "hotspots": hotspots,
         "persistence": persistence, "other": other, "ci": ci, "truncated": scanned > max_files,
+        "sourceSets": source_sets,
     }
 
 
 def render(inv, root):
     out = ["# Repository inventory (`mobile recon`)", ""]
     profile = detect.profile_lines(inv["facts"])
-    out += profile or ["- No iOS, Android or Flutter project detected."]
+    out += profile or ["- No iOS, Android, Flutter, React Native or Kotlin Multiplatform project detected."]
     out += ["", "## Size"]
     for name, data in sorted(inv["languages"].items(), key=lambda kv: -kv[1]["lines"]):
         out.append("- %s: %d files, %d lines" % (name, data["files"], data["lines"]))
@@ -195,6 +246,9 @@ def render(inv, root):
             extras.append("%d %s" % (inv["persistence"][key], label))
     if extras:
         out.append("- Also: " + ", ".join(extras))
+    if inv.get("sourceSets"):
+        out.append("- Kotlin files per source set: " + ", ".join(
+            "%s %d" % item for item in sorted(inv["sourceSets"].items(), key=lambda kv: -kv[1])))
     if inv["ci"]:
         out.append("- CI and release: " + ", ".join(inv["ci"]))
     production = {k: v for k, v in inv["patterns"].items() if k not in _TEST_LABELS}

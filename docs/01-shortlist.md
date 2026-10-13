@@ -47,6 +47,16 @@ Stars are never a reason here. The reasons are: does it target mistakes agents a
 | 2 | [Axiom](https://github.com/CharlesWiltgen/Axiom) (**G**, MIT, pushed daily) | the broadest iOS legacy coverage found | `/plugin marketplace add CharlesWiltgen/Axiom` | by its README, 276 skills, 42 agents and 17 commands. Read it for ideas, and measure the context cost before enabling all of it for a team |
 | 2 | AvdLee SwiftUI Expert, Swift Testing skills, App Store Connect CLI (`asc`), sosumi.ai, [apple/xcode-project-format](https://github.com/apple/xcode-project-format) (**G**) | Instruments trace scripts; release automation; the JSON project file | see each README | add only when the need is real |
 
+For architecture, dependency injection and modules specifically (all **P**):
+
+| What | Take from it | Cost and risk |
+|---|---|---|
+| [hmlongco/Factory](https://github.com/hmlongco/Factory) (MIT, last commit 2026-09-25) | the library's author maintains a skill for Factory 3 in the repository itself | only for projects that use Factory |
+| [tuist/agent-plugin](https://github.com/tuist/agent-plugin) (MIT) | twelve skills for Tuist operations: migrating to generated projects, flaky tests, cache analysis, plus a remote MCP server | about running Tuist, not about how to structure an app |
+| [efremidze/swift-architecture-skill](https://github.com/efremidze/swift-architecture-skill) (MIT, last commit 2026-09-28) | one reference per pattern: MVVM, MVI, MVP, VIPER, TCA, Clean, Coordinator | a community skill |
+
+Point-Free's own skills for The Composable Architecture are for paying members only, with a licence per member. Xcode 27 ships built-in skills of Apple's (a SwiftUI specialist among them), none about architecture, dependency injection or modules. Check licences before copying anything: some popular Swift skill sets are not open source, and the copies of Apple's Xcode skills on GitHub carry no licence (**P**).
+
 Not considered: [Periphery](https://github.com/peripheryapp/periphery), because its repository is archived (**G**).
 
 **What these cover least** (and this toolkit's iOS pack targets): UIKit lifecycle and memory, Objective-C interop, CocoaPods to SwiftPM, the scene-lifecycle requirement, xcconfig layering and signing failures, app size, and how the toolchain behaves inside the sandbox.
@@ -63,6 +73,8 @@ Nothing in this section was tested locally: the build machine has no JDK and no 
 | 1 | [gradle/gradle-skills](https://github.com/gradle/gradle-skills) (**G**, Apache-2.0) | build logic practice, with published A/B evals | `/plugin marketplace add gradle/gradle-skills` then `/plugin install gradle-skills@gradle-skills` | generic Gradle, not AGP-specific |
 | 1 | Android Lint, ktlint or Spotless, compose-rules, Roborazzi | the deterministic ground truth | Gradle plugins | none |
 | 2 | [Kotlin/kotlin-agent-skills](https://github.com/Kotlin/kotlin-agent-skills) (**G**) | Java to Kotlin conversion procedure | `claude plugin marketplace add Kotlin/kotlin-agent-skills` | its RxJava table (`references/frameworks/RXJAVA.md`) maps `observeOn(mainThread())` to "`flowOn(Dispatchers.Main)` or collect on Main". Only the second keeps the meaning, because `flowOn` changes where the upstream runs; this toolkit's `legacy.md` covers the difference |
+| 1 | [android/nav3-recipes](https://github.com/android/nav3-recipes) (**P**, Apache-2.0, last commit 2026-10-09), official | runnable Navigation 3 recipes: modular apps with Hilt or Koin, deep links, results, adaptive scenes | nothing to install: read or copy a recipe | none |
+| 2 | [android/nowinandroid](https://github.com/android/nowinandroid) (**P**, Apache-2.0) | Google's reference app: module layout, convention plugins, an `AGENTS.md` | read it | its `AGENTS.md` still says Navigation 2 while the code uses Navigation 3, and its pinned versions trail the stable releases. Use it for structure, not for version numbers |
 | 2 | kotlin-lsp | navigation in pure-Kotlin modules | `brew install JetBrains/utils/kotlin-lsp`, `/plugin install kotlin-lsp@claude-plugins-official` | alpha; open issues on Android modules (**P**) |
 | 2 | Firebase MCP (Crashlytics), skydoves Compose skills and compose-stability-analyzer, Develocity | crash triage; Compose stability as a CI gate | see each README | Firebase's default exposes write tools: pass `--only crashlytics` |
 
@@ -77,11 +89,44 @@ Nothing in this section was tested locally: the build machine has no JDK and no 
 | 1 | [marionette_mcp](https://github.com/leancodepl/marionette_mcp) (**G**, Apache-2.0) | drive a running app to verify a change | `flutter pub add marionette_flutter`, `dart pub global activate marionette_mcp`, `claude mcp add --transport stdio marionette -- marionette_mcp` | pre-1.0, debug and profile builds only, needs a binding in the app |
 | 2 | [VGV AI Flutter plugin](https://github.com/VeryGoodOpenSource/vgv-ai-flutter-plugin) (**G**, MIT) | the best-engineered pack found: 15 skills, a reviewer, 102 two-arm eval cases | `claude plugin marketplace add VeryGoodOpenSource/very-good-claude-code-marketplace && claude plugin install vgv-ai-flutter-plugin` | a hook (`hooks/scripts/block-cli-workarounds.sh`) denies `flutter test`, `dart test` and `flutter create` in favour of Very Good CLI. A good fit for a Bloc and VGV-style codebase; elsewhere it gets in the way |
 | 2 | [flutter/agent-plugins](https://github.com/flutter/agent-plugins) (**G**, BSD-3), official | `dart-resolve-package-conflicts`, the FFI skills | `claude plugin marketplace add flutter/agent-plugins` then `claude plugin install dart-flutter@dart-flutter` | 25 skills, most of them produced from documentation by the repository's own generator with a model (`tool/generator/`), and aimed at new projects more than existing ones (**P**). Cherry-pick |
+| 2 | [vgv-ffca-plugin](https://github.com/VeryGoodOpenSource/vgv-ffca-plugin) (**P**, MIT, last commit 2026-10-01) | rules for a feature-first Clean Architecture monorepo (`apps/`, `features/`, `shared/`), with a hook that blocks pubspec edits that break the layer rules | from the same Very Good marketplace | only for a codebase built that way |
 | 2 | Patrol, Maestro, Sentry or Firebase crash tools, DCM | native-dialog E2E; black-box flows; crash triage; unused code | see each README | add when the need is real |
 
 Not considered: [custom_lint](https://github.com/invertase/dart_custom_lint), whose repository is archived (**G**), and golden_toolkit, which pub.dev marks as discontinued.
 
+Packages can now ship their own skills: `dart run skills@ get` copies them into `.agents/skills/`. Of the packages named in this toolkit only `get_it` and `watch_it` do (**P**).
+
 **What these cover least** (and the Flutter pack targets): GetX and other state-management migrations, Navigator 1.0 to go_router, null-safety on very old code, native build failures inside a Flutter project, and stored-data migrations.
+
+## Kotlin Multiplatform
+
+Nothing in this section was tested locally: the build machine has no JDK.
+
+| Tier | What | Take from it | Install | Cost and risk |
+|---|---|---|---|---|
+| 1 | [Kotlin/kotlin-agent-skills](https://github.com/Kotlin/kotlin-agent-skills) (**P**, Apache-2.0, last commit 2026-09-11), by JetBrains | three jobs this toolkit does not repeat: the AGP 9 migration of a multiplatform project, CocoaPods to Swift Package Manager, Kotlin/Native build performance | `claude plugin marketplace add Kotlin/kotlin-agent-skills` | the Kotlin docs that point to these skills warn that "AI processing results are not entirely predictable": review the diff |
+| 1 | [SKIE](https://github.com/touchlab/SKIE) (**P**, Apache-2.0, 0.10.15 on 2026-09-25) | a better Swift API from Kotlin: `async` with cancellation, typed flows, exhaustive enums | a Gradle plugin in the shared module | supports a fixed list of Kotlin versions: on the build date it had no release for Kotlin 2.4.21, the newest. Turning it on or off changes the Swift API |
+| 2 | [KMP-NativeCoroutines](https://github.com/rickclephas/KMP-NativeCoroutines) (**P**, MIT, 1.0.6) | coroutines and flows in Swift with cancellation, without replacing the whole export | a Gradle plugin and a Swift package | also tied to exact Kotlin versions |
+| 2 | [KMMBridge](https://github.com/touchlab/KMMBridge) (**P**, Apache-2.0) | publishes the shared framework as a Swift package for a separate iOS repository | a Gradle plugin | last tagged release January 2025 |
+
+Google's `agp-9-upgrade` skill says not to use it on Kotlin Multiplatform projects; JetBrains' migration skill is the one for that (**P**).
+
+**What these cover least** (and the Kotlin Multiplatform pack targets): what common code may use, the design of the API Swift sees, how Kotlin, AGP, Xcode and the compiler plugins constrain each other, and structure and tests for shared code.
+
+## React Native
+
+Nothing in this section was tested locally.
+
+| Tier | What | Take from it | Install | Cost and risk |
+|---|---|---|---|---|
+| 1 | [expo/skills](https://github.com/expo/skills) (**P**, MIT, last commit 2026-10-05), official | 24 skills for Expo Router, SDK upgrades, EAS Build, Update and Workflows, and native modules; it also registers the Expo MCP server | `claude plugin install expo@claude-plugins-official` | 24 descriptions in every session: enable it only in Expo repositories. The MCP server is remote |
+| 1 | [callstackincubator/agent-skills](https://github.com/callstackincubator/agent-skills) (**P**, MIT, last commit 2026-10-08) | `react-native-best-practices` (performance: measure first), `upgrading-react-native`, brownfield migration | see its README | nine skills: pick the ones you need |
+| 2 | [software-mansion-labs/skills](https://github.com/software-mansion-labs/skills) (**P**) | Reanimated 4, Gesture Handler 3 and worklets, from the libraries' authors | see its README | the skill files say MIT but the repository has no licence file at its root |
+| 2 | [react-navigation/skills](https://github.com/react-navigation/skills) (**P**) | official migration skills: static configuration, version 6 to 7, 7 to 8 | see its README | no licence file |
+
+The template that `create-expo-app` generates now ships an `AGENTS.md` headed "Expo has changed - do not trust your training data" (**P**). Take it at its word: read the installed SDK version and that version's documentation.
+
+**What these cover least** (and the React Native pack targets): which change needs a store build and which may go over the air, versioning of stored data, the generated-native-folder rule as an enforced guard, a table of removed APIs by version, and the stores' rules for updates.
 
 ## Cross-platform
 

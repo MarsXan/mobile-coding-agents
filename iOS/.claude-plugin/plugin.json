@@ -1,6 +1,6 @@
 {
   "name": "mobile-ios",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "iOS expertise pack for the mobile-coding-agents toolkit: build and signing, UIKit and Objective-C legacy, concurrency migration, persistence, testing, performance, release gates",
   "author": { "name": "Mohsen" },
   "keywords": ["ios", "swift", "swiftui", "uikit", "xcode"],

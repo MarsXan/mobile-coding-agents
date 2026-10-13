@@ -1,0 +1,5 @@
+schema_version: "1.1"
+name: common-code-stays-multiplatform
+tags: [kotlin-multiplatform, guard]
+context:
+  scaffold_script: fixture.sh

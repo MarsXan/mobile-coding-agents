@@ -34,6 +34,6 @@
 
 ## Never without a person
 
-- Uploading or publishing anything: TestFlight, App Store Connect, Google Play, Firebase App Distribution, pub.dev.
+- Uploading or publishing anything: TestFlight, App Store Connect, Google Play, Firebase App Distribution, an over-the-air update, pub.dev, npm.
 - Changing signing material, provisioning profiles, keystores or CI secrets.
 - Force-pushing, rewriting history, or deleting branches on the remote.

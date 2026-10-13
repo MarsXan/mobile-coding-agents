@@ -69,7 +69,7 @@ def _session(payload, root, create=True):
     facts = detect.detect(root)
     session = {"root": root, "platforms": facts["platforms"], "notes": []}
     if facts["platforms"]:
-        session["baseline"] = verify.source_fingerprint(root)
+        session["baseline"] = verify.source_fingerprint(root, facts["platforms"])
     try:
         util.write_json(path, session)
     except OSError:
@@ -101,7 +101,7 @@ def session_start(payload):
         session["nagged"] = previous.get("nagged")
         session["noticed"] = previous.get("noticed")
     else:
-        session["baseline"] = verify.source_fingerprint(root)
+        session["baseline"] = verify.source_fingerprint(root, facts["platforms"])
     _save(session, path)
 
     config = config_module.load(root)
@@ -277,7 +277,7 @@ def stop(payload):
     gate = config["verifyGate"]
     if config.keel_adopted or gate == "off":
         return 0
-    current = verify.source_fingerprint(root)
+    current = verify.source_fingerprint(root, session["platforms"])
     if current == session.get("baseline") or verify.read_stamp(root).get("fingerprint") == current:
         if session.get("noticed"):
             session["noticed"] = False      # verified again: the next unverified change is news

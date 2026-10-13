@@ -1,0 +1,17 @@
+{
+  "name": "mobile-kotlin-multiplatform",
+  "version": "0.3.0",
+  "description": "Kotlin Multiplatform expertise pack for the mobile-coding-agents toolkit: shared code and source sets, the Swift-facing API, Xcode and Gradle integration, architecture, storage, testing",
+  "author": {
+    "name": "Mohsen"
+  },
+  "keywords": [
+    "kotlin",
+    "kotlin-multiplatform",
+    "kmp",
+    "compose-multiplatform"
+  ],
+  "dependencies": [
+    "mobile-core"
+  ]
+}
