@@ -99,6 +99,7 @@ Verified on the machine this was built on (macOS 26, Xcode 26.0, Flutter 3.44.8,
 - Toolchain behaviour inside Claude Code's sandbox, for SwiftPM, `xcodebuild`, `simctl` and Flutter.
 - The eval suites, three runs per arm on Sonnet: with the plugins the suite scores 0.99; five cases fail without them (a live key written to source, a generated file hand-edited, a deep link that only works while the app is running, no measurement before a performance fix, no behaviour pinning before a legacy refactor). The plugin arm cost about 40% more per run. Details in the setup guide.
 - Session-start facts reaching the model, and the Dart language server answering through the Flutter pack, in a live session.
+- Installing from GitHub into a clean Claude Code configuration: the marketplace, then `mobile-core` and `mobile-ios`.
 
 Not verified:
 
