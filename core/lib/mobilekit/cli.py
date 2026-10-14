@@ -60,7 +60,7 @@ def main(argv=None):
             print(json.dumps(facts, indent=2))
         else:
             lines = detect.profile_lines(facts)
-            print("\n".join(lines) if lines else "No iOS, Android or Flutter project detected in %s" % facts["root"])
+            print("\n".join(lines) if lines else "No mobile project detected in %s" % facts["root"])
         return 0
     if args.command == "verify":
         from . import verify
