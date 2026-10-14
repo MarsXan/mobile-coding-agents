@@ -13,6 +13,7 @@ Read the project facts first: the session-start profile, or `mobile detect`. The
 - **Is the native code generated?** If the profile says `ios/` and `android/` come from `expo prebuild`, never edit them: change `app.json` / `app.config.*` or a config plugin. The edit guard refuses otherwise. In a project that keeps them in git they are ordinary source.
 - **Add dependencies the project's way.** In an Expo project use `npx expo install <package>`, which picks the version that matches the SDK; `npm install <package>` often picks a newer major with a different API. Use the package manager in the profile and never mix lockfiles.
 - **Match the code you are in.** Class components stay class components, the existing state library stays the state library, unless the task is that migration (`mobile-core:migrate`).
+- **Components draw; they do not decide.** Logic goes to hooks, the store or the query layer. If the project has Storybook, each new or changed component gets one story per state it draws.
 - Check with `mobile verify`: the type check, lint on changed files, and Jest.
 
 ## Load the reference that matches the task

@@ -10,6 +10,7 @@ Read the project facts first: the session-start profile, or `mobile detect`. Min
 ## Working in this codebase
 
 - Match the framework and style of the file you are in. Modernise only when that is the task (`mobile-core:safe-change`, `mobile-core:migrate`).
+- Every view gets one named `#Preview` per state it draws, from fixture data, and holds no logic: it draws state and reports what the user did. `@Previewable` and UIKit previews need iOS 17; below that minimum, mark the preview `@available(iOS 17, *)`.
 - Check with `mobile verify`. For raw `xcodebuild` commands and what their failures mean, read `references/build.md`.
 - Read the toolchain; do not recall it: `xcodebuild -version`, `swift --version`.
 - Apple's documentation is available as Markdown: add `.md` to a `developer.apple.com/documentation/...` URL. Xcode also ships Apple-written guides for recent APIs in `/Applications/Xcode.app/Contents/PlugIns/IDEIntelligenceChat.framework/Versions/A/Resources/AdditionalDocumentation/`. Read the relevant one before using an API from the last two releases.

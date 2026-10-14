@@ -13,6 +13,7 @@ Read the project facts first: the session-start profile, or `mobile detect`. Dar
 - **Keep the architecture that is there.** Use the state-management and routing libraries already in the profile. Do not add a second one, and do not restructure to a pattern the task did not ask for (`mobile-core:safe-change`, `mobile-core:migrate`).
 - Check with `mobile verify`. For raw commands and what failures mean, read `references/build.md`.
 - Generated files are outputs. Change the annotated source and run the generator.
+- **Widgets draw; they do not decide.** Logic goes to the bloc, notifier or view model. When the SDK ships `package:flutter/widget_previews.dart`, every screen and reusable widget gets one `@Preview` per state it draws, from fixture data.
 
 ## Load the reference that matches the task
 

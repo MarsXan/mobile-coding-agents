@@ -23,6 +23,7 @@
 - **Minimum versions decide which APIs exist.** Guard anything newer than the oldest supported OS, with a real fallback.
 - **Stored data outlives the build.** Changing a persisted model, table, key or file format needs a versioned migration and a test that opens data written by the previous version.
 - **No secret in the repository or the app binary.** Build-time keys come from untracked files that CI supplies; real secrets stay on a server.
+- **Views draw; they do not decide.** Every screen and reusable view has a preview for each state it draws (empty, loading, error, the longest text), built from fixture data. Rules, validation, formatting decisions and data access live where this project's pattern puts them, not in the view.
 - **Do not silence a check to make it pass**: no new lint suppressions, skipped tests, looser snapshot thresholds or compiler escape hatches. Fix the cause or ask.
 - **Done means verified.** Say what you ran and what it printed. If something could not be verified here, say that instead.
 

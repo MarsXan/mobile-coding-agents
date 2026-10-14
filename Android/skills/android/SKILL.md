@@ -10,6 +10,7 @@ Read the project facts first: the session-start profile, or `mobile detect`. min
 ## Working in this codebase
 
 - Match the stack of the file you are in. Modernise only when that is the task (`mobile-core:safe-change`, `mobile-core:migrate`).
+- Every composable screen and component gets one `@Preview` per state it draws, from fixture data, and holds no logic. Preview the inner composable that takes state and event lambdas, never one that builds a ViewModel.
 - Check with `mobile verify`. For raw Gradle commands and what their failures mean, read `references/build.md`.
 - Always use the wrapper (`./gradlew`), never a global `gradle`.
 - Read versions from the version catalog and `./gradlew --version`; do not recall them. Compatibility between AGP, Gradle, the JDK, Kotlin and compileSdk is a matrix: look it up in the release notes for this project's AGP.
