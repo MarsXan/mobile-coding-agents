@@ -49,7 +49,7 @@ core/                             mobile-core
   agents/                           cartographer (maps code), reviewer (fresh-context review)
   workflows/migration-audit.js      read-only, parallel assessment of every module for a migration
   templates/                        AGENTS.md, CLAUDE.md, settings fragments, path-scoped rules, CI jobs, Keel fragments
-  tests/                            124 unit tests
+  tests/                            126 unit tests
   evals/                            8 eval cases for the core alone
 iOS/  Android/  Flutter/          one skill each, with nine reference files: build, legacy, architecture,
                                   modules, concurrency, persistence, testing, performance, release; plus a
@@ -119,10 +119,11 @@ Inside a Claude Code session with the plugin enabled, `mobile` is on the path. A
 
 Verified on the machine this was built on (macOS 26, Xcode 26.0, Flutter 3.44.8, Claude Code 2.1.296):
 
-- 124 unit tests pass on Python 3.13 and on the system Python 3.9.
+- 126 unit tests pass on Python 3.13 and on the system Python 3.9.
 - All six plugins and the marketplace pass `claude plugin validate --strict`.
 - Always-on cost: about 1,230 tokens for the core, 250 to 275 for each platform pack.
 - `detect`, `recon` and `doctor` were run read-only against a production iOS codebase of about 350,000 lines. `detect`, architecture counts included, takes about 90 ms there.
+- `detect`, `recon`, `doctor`, `risk` and `verify --dry-run` were run read-only on three public Android apps: Now in Android, Architecture Samples and Sunflower. No Gradle task ran.
 - Toolchain behaviour inside Claude Code's sandbox, for SwiftPM, `xcodebuild`, `simctl` and Flutter.
 - The eval suite, 20 cases, three runs per arm on Sonnet, on this version: with the plugins it scores 0.98, without them 0.80. Six cases fail without them (a live key written to source, a generated Dart file hand-edited, a generated `Info.plist` hand-edited in an Expo app, a deep link that only works while the app is running, no measurement before a performance fix, no behaviour pinning before a legacy refactor). Thirteen cases come out the same either way. Details in the setup guide.
 - Overhead on the six cases that edit code, against no plugin in the same batch: 8% more turns, 27% more cost, and about the same time (14.5 against 14.2 seconds). Turns and cost per task are unchanged from 0.2.0. With the stop gate of 0.1.0 the overhead was 38% in turns, 51% in cost and 56% in time.

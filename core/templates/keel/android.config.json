@@ -21,7 +21,7 @@
     "protected": ["config/detekt/**", "detekt.yml", ".editorconfig", "lint.xml", "**/lint-baseline.xml", ".mobile-coding-agents.json", ".gitlab-ci.yml", ".github/workflows/**"]
   },
   "checks": [
-    { "id": "compile", "run": "./gradlew --console=plain -q compileDebugKotlin", "stages": ["stop"], "timeoutSec": 900 },
+    { "id": "compile", "run": "./gradlew --console=plain -q compileDebugSources", "stages": ["stop"], "timeoutSec": 900 },
     { "id": "unit-tests", "run": "./gradlew --console=plain -q testDebugUnitTest", "stages": ["stop"], "timeoutSec": 1800 },
     { "id": "mobile-risk", "run": "python3 TOOLKIT/core/bin/mobile risk --fail-on block", "stages": ["stop", "ci"] },
     { "id": "lint-all", "run": "./gradlew --console=plain -q lintDebug", "stages": ["ci"], "timeoutSec": 1800 }

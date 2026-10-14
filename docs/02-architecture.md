@@ -12,7 +12,7 @@
 │  ├ agents/           cartographer, reviewer          ├ ReactNative/          mobile-react-native          8 references        │
 │  ├ workflows/        migration-audit                 └ KotlinMultiplatform/  mobile-kotlin-multiplatform  5 references        │
 │  ├ templates/        project overlay, CI, Keel       each pack: a router skill (SKILL.md), its reference files, and a         │
-│  └ tests/, evals/    124 unit tests, 8 eval cases    one-line pointer at session start. Flutter adds the Dart analyzer.       │
+│  └ tests/, evals/    126 unit tests, 8 eval cases    one-line pointer at session start. Flutter adds the Dart analyzer.       │
 │                                                                                                                               │
 │  evals/  12 cross-plugin eval cases                  scripts/  check, probe                                                   │
 └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -41,7 +41,7 @@ Six plugins rather than one, because a repository enables only what it holds: an
 | Agents imitate when tests can be weakened | Agents raised screenshot thresholds and deleted assertions to pass ([Android Bench](https://developer.android.com/bench)) | The agent is told at the edit, and `mobile risk` reports new suppressions, skipped tests, looser tolerances, removed assertions and deleted tests for review. `"prompts": "strict"` turns the first three into a prompt |
 | Multi-agent is expensive | Agents use about 4 times the tokens of chat, multi-agent systems about 15 times ([Anthropic](https://www.anthropic.com/engineering/multi-agent-research-system)) | Two agents, each for isolation. One workflow, read-only, for a job that is genuinely parallel |
 | Speed without stability is not progress | AI adoption "improves software delivery throughput ... it still increases delivery instability"; small batches are one of the capabilities that keep the benefit ([DORA 2025](https://services.google.com/fh/files/misc/2025_state_of_ai_assisted_software_development.pdf)) | Migrations in reviewable slices; `mobile risk` warns above 400 changed lines; verification before "done" |
-| Test the harness | Of the mobile skill packs surveyed, few ship evals and fewer publish results | 124 unit tests for the deterministic parts, 20 eval cases that run with and without the plugins |
+| Test the harness | Of the mobile skill packs surveyed, few ship evals and fewer publish results | 126 unit tests for the deterministic parts, 20 eval cases that run with and without the plugins |
 
 ## Which mechanism for which job
 
@@ -80,7 +80,7 @@ The question for each job is: must it happen every time, does it need judgment, 
 | Layer | Stops | Cannot stop | Status here |
 |---|---|---|---|
 | Permission rules (`deny`, `ask`, `allow`) | the invocation the agent normally writes; reads of secret files | the same program invoked another way (`sh -c`, a full path). Claude Code's docs: "isn't a security boundary" | template in `core/templates/settings/` |
-| Hooks in this plugin | wrapped and nested forms too (`bundle exec fastlane`, `git -C . push --force`, `sh -c 'rm -rf ~'`), by parsing the command; content of edits | a hook that fails to start: by default the action proceeds, with a visible notice. Set `onFailure: "block"` for fail-closed | 124 tests, including bypass cases |
+| Hooks in this plugin | wrapped and nested forms too (`bundle exec fastlane`, `git -C . push --force`, `sh -c 'rm -rf ~'`), by parsing the command; content of edits | a hook that fails to start: by default the action proceeds, with a visible notice. Set `onFailure: "block"` for fail-closed | 126 tests, including bypass cases |
 | Auto mode classifier | irreversible and out-of-scope actions without prompts | everything: Anthropic measured 17% of overeager actions missed | recommended mode; add the entries in `03-setup-and-validation.md` |
 | OS sandbox | writes outside the project and network to unlisted hosts, for every child process | `xcodebuild` and `simctl` must run outside it (tested) | settings per platform in `03` |
 | CI | anything that reaches a merge request, whatever produced it | nothing local | `mobile risk` and a secret scan; the authority |

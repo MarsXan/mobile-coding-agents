@@ -4,7 +4,8 @@
 
 ```sh
 ./gradlew --version                                   # Gradle, Kotlin and JVM actually in use
-./gradlew --console=plain :app:compileDebugKotlin     # fastest compile check
+./gradlew --console=plain :app:compileDebugSources    # compile check, Java and Kotlin
+./gradlew --console=plain :app:compileDebugKotlin     # faster in a Kotlin-only module
 ./gradlew --console=plain :feature:login:testDebugUnitTest --tests 'com.example.LoginViewModelTest'
 ./gradlew --console=plain :app:lintDebug
 ./gradlew :app:dependencyInsight --dependency okhttp --configuration debugRuntimeClasspath

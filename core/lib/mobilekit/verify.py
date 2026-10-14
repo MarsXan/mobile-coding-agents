@@ -70,7 +70,7 @@ def source_fingerprint(root, platforms=()):
                             blobs.pop(path, None)
             return "git:" + util.sha1("\n".join("%s %s" % item for item in sorted(blobs.items())))
     digest = hashlib.sha1()
-    for rel, is_dir in util.walk(root, max_depth=12):
+    for rel, is_dir in util.walk(root, max_depth=util.SOURCE_DEPTH):
         if is_dir or not config_module.is_source(rel.replace(os.sep, "/"), platforms):
             continue
         try:
@@ -233,10 +233,10 @@ def _android_steps(root, facts, level, changed):
     if "flavors" in android.get("flags", []):
         raise NeedsConfig(
             "Android: product flavors are defined, so task names carry a flavor. Set verify.android.%s in %s, "
-            "for example \"./gradlew --console=plain :app:compileStagingDebugKotlin\"." % (level, config_module.CONFIG_NAME))
+            "for example \"./gradlew --console=plain :app:compileStagingDebugSources\"." % (level, config_module.CONFIG_NAME))
     cwd = os.path.dirname(wrapper) or None
     base = ["./gradlew", "--console=plain", "-q"]
-    tasks = {"quick": ["compileDebugKotlin"], "test": ["testDebugUnitTest"], "full": ["lintDebug", "testDebugUnitTest"]}[level]
+    tasks = {"quick": ["compileDebugSources"], "test": ["testDebugUnitTest"], "full": ["lintDebug", "testDebugUnitTest"]}[level]
     return [Step("gradle-" + level, base + tasks, cwd=cwd)]
 
 

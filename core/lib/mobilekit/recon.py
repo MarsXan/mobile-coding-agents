@@ -154,7 +154,7 @@ def inventory(root, max_files=20000):
     uses_js = "react-native" in facts["platforms"]
     source_sets = {}
     scanned = 0
-    for rel, is_dir in util.walk(root, max_depth=14):
+    for rel, is_dir in util.walk(root, max_depth=util.SOURCE_DEPTH):
         posix = rel.replace(os.sep, "/")
         name = posix.rsplit("/", 1)[-1]
         if is_dir:

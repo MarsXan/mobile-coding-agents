@@ -17,7 +17,7 @@ Optional: SwiftLint or ktlint (lint feedback on edited lines, only when the proj
 scripts/check.sh
 ```
 
-Runs the 124 unit tests on each Python found, parses every JSON file, checks skill frontmatter and reference links, runs every eval fixture, validates all plugins with `claude plugin validate --strict`, prints each plugin's always-on token cost, and parses the workflow script. No model calls. Expect `ALL CHECKS PASSED`.
+Runs the 126 unit tests on each Python found, parses every JSON file, checks skill frontmatter and reference links, runs every eval fixture, validates all plugins with `claude plugin validate --strict`, prints each plugin's always-on token cost, and parses the workflow script. No model calls. Expect `ALL CHECKS PASSED`.
 
 ## 2. Look before changing anything
 

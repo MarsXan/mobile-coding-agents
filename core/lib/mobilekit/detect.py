@@ -67,7 +67,7 @@ def _collect(root):
         "xcconfig": [], "package_json": [], "kmp_modules": [], "counts": {}, "names": set(), "markers": {},
     }
     counts = found["counts"]
-    for rel, is_dir in util.walk(root, max_depth=14):
+    for rel, is_dir in util.walk(root, max_depth=util.SOURCE_DEPTH):
         name = rel.rsplit(os.sep, 1)[-1]
         if is_dir:
             if name.endswith(".xcodeproj"):
@@ -213,6 +213,27 @@ def _ios_facts(root, found, native_projects, native_packages, native_podfiles, n
     return facts
 
 
+def _build_logic_files(root, base, native_settings, limit=300):
+    """Sources of buildSrc and of builds included from settings: convention plugins often set flavors and SDK levels."""
+    dirs = [os.path.join(base, "buildSrc")]
+    for settings in native_settings[:2]:
+        text = util.read_text(os.path.join(root, settings))
+        for path in re.findall(r"includeBuild\s*\(?\s*[\"']([^\"']+)[\"']", text):
+            joined = os.path.normpath(os.path.join(os.path.dirname(settings), path))
+            if joined not in (".", "") and not joined.startswith("..") and not os.path.isabs(joined):
+                dirs.append(joined)
+    files = []
+    for rel_dir in dict.fromkeys(dirs):
+        if not os.path.isdir(os.path.join(root, rel_dir)):
+            continue
+        for rel, is_dir in util.walk(os.path.join(root, rel_dir), max_depth=util.SOURCE_DEPTH):
+            if not is_dir and rel.endswith((".kt", ".kts", ".gradle", ".groovy")):
+                files.append(os.path.join(rel_dir, rel))
+                if len(files) >= limit:
+                    return files
+    return files
+
+
 def _android_facts(root, found, native_settings, native_builds):
     facts = {
         "gradle": None, "agp": None, "kotlin": None, "composeBom": None,
@@ -233,6 +254,8 @@ def _android_facts(root, found, native_settings, native_builds):
     sources = [catalog]
     for build in native_builds[:200]:
         sources.append(util.read_text(os.path.join(root, build), limit=400_000))
+    for rel in _build_logic_files(root, base, native_settings):
+        sources.append(util.read_text(os.path.join(root, rel), limit=400_000))
     for text in sources:
         if not text:
             continue

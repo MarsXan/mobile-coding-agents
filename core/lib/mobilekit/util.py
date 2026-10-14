@@ -26,6 +26,9 @@ BUNDLE_SUFFIXES = (
 )
 
 MAX_WALK_ENTRIES = 60000
+# Deep enough for Kotlin and Java package folders in nested Gradle modules:
+# feature/x/impl/src/main/kotlin/com/example/app/feature/x/impl/XViewModel.kt is 15 levels.
+SOURCE_DEPTH = 24
 
 # Test code by convention: an `AppTests/` or `AppUITests/` target, `src/test`,
 # `src/androidTest`, `src/commonTest`, `test/`, `integration_test/`,

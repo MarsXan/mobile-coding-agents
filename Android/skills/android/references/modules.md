@@ -42,7 +42,7 @@ Constructor injection everywhere; one place builds the graph. Google's guide rec
 - Only the new DSL is available: `applicationVariants` and friends are gone; use `androidComponents`.
 - `org.jetbrains.kotlin.multiplatform` cannot share a module with the Android application or library plugin.
 - Every library module needs its own package name (`android.uniquePackageNames=true`), and `resValues` and shaders are off unless a module turns them on.
-- R classes are non-transitive (since AGP 8) and, from AGP 9, non-final in app modules: no `R` fields in a `when` that needs constants, and a resource is referenced through the module that declares it.
+- R classes are non-transitive, and non-final in app modules too, both since AGP 8: no `R` fields in a Java `switch` or an annotation argument, and a resource is referenced through the module that declares it.
 - The opt-out flags for the old DSL and for built-in Kotlin are removed in AGP 10.
 
 ## Mistakes to expect from yourself

@@ -76,6 +76,30 @@ class DetectTests(unittest.TestCase):
             self.assertIn(flag, android["flags"])
         self.assertIn("minSdk 24", "\n".join(detect.profile_lines(facts)))
 
+    def test_convention_plugins_count_for_flavors_and_sdk_levels(self):
+        plugin = 'android {\n    compileSdk = 36\n    defaultConfig.targetSdk = 36\n    productFlavors { create("demo") }\n}\n'
+        for build_dir, settings in (
+                ("build-logic", 'pluginManagement { includeBuild("build-logic") }\nrootProject.name = "Example"\ninclude(":app")\n'),
+                ("buildSrc", None)):
+            with self.subTest(build_dir):
+                project = fixtures.android_project(git=False)
+                self.addCleanup(project.cleanup)
+                if settings:
+                    project.write("settings.gradle.kts", settings)
+                project.write("app/build.gradle.kts", 'plugins { id("example.android.application") }\n')
+                project.write(build_dir + "/convention/src/main/kotlin/AndroidApplicationConventionPlugin.kt", plugin)
+                android = detect.detect(project.root)["android"]
+                self.assertIn("flavors", android["flags"])
+                self.assertEqual(android["compileSdk"], [36])
+                self.assertEqual(android["targetSdk"], [36])
+
+    def test_deep_kotlin_package_folders_are_counted(self):
+        project = fixtures.android_project(git=False)
+        self.addCleanup(project.cleanup)
+        project.write("feature/foryou/impl/src/main/kotlin/com/google/samples/apps/example/feature/foryou/impl/ui/ForYouViewModel.kt",
+                      "class ForYouViewModel\n")
+        self.assertEqual(detect.detect(project.root)["architecture"].get("view models"), 1)
+
     def test_flutter_project_owns_its_embedded_native_folders(self):
         project = fixtures.flutter_project(git=False)
         self.addCleanup(project.cleanup)
@@ -300,6 +324,8 @@ class VerifyRunTests(unittest.TestCase):
         self.addCleanup(android.cleanup)
         _, text = self.run_verify(android, level="test", dry_run=True)
         self.assertIn("./gradlew --console=plain -q testDebugUnitTest", text)
+        _, text = self.run_verify(android, level="quick", dry_run=True)
+        self.assertIn("./gradlew --console=plain -q compileDebugSources", text)
         flutter = fixtures.flutter_project(git=True)
         self.addCleanup(flutter.cleanup)
         _, text = self.run_verify(flutter, level="quick", dry_run=True)
